@@ -24,9 +24,12 @@ FIRECRAWL_API_KEY=your_firecrawl_api_key    # https://firecrawl.dev
 # =================================================================
 # AI PROVIDER - Choose your LLM
 # =================================================================
+OPENAI_API_KEY=your_openai_compatible_api_key
+OPENAI_BASE_URL=https://a.ah-api.com/v1
+
+# Optional other providers
 GEMINI_API_KEY=your_gemini_api_key        # https://aistudio.google.com/app/apikey
 ANTHROPIC_API_KEY=your_anthropic_api_key  # https://console.anthropic.com
-OPENAI_API_KEY=your_openai_api_key        # https://platform.openai.com
 GROQ_API_KEY=your_groq_api_key            # https://console.groq.com
 
 # =================================================================
@@ -61,6 +64,19 @@ pnpm dev  # or npm run dev / yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+## OpenAI Compatible API
+
+The project now defaults to OpenAI-compatible routing for `openai/*` models.
+
+Set these two variables to use your compatible endpoint:
+
+```env
+OPENAI_API_KEY=your_openai_compatible_api_key
+OPENAI_BASE_URL=https://a.ah-api.com/v1
+```
+
+The default model is `openai/gpt-5`. If your provider exposes a different model name, update the model selection in the UI or adjust [`config/app.config.ts`](/Volumes/T9/open-lovable/config/app.config.ts).
 
 ## License
 

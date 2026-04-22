@@ -14,12 +14,14 @@ export type ProviderClient =
   | ReturnType<typeof createGoogleGenerativeAI>;
 
 export interface ProviderResolution {
+  provider: ProviderName;
   client: ProviderClient;
   actualModel: string;
 }
 
 const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
 const aiGatewayBaseURL = 'https://ai-gateway.vercel.sh/v1';
+export const defaultOpenAICompatibleBaseURL = 'https://a.ah-api.com/v1';
 const isUsingAIGateway = !!aiGatewayApiKey;
 
 // Cache provider clients by a stable key to avoid recreating
@@ -32,7 +34,10 @@ function getEnvDefaults(provider: ProviderName): { apiKey?: string; baseURL?: st
 
   switch (provider) {
     case 'openai':
-      return { apiKey: process.env.OPENAI_API_KEY, baseURL: process.env.OPENAI_BASE_URL };
+      return {
+        apiKey: process.env.OPENAI_API_KEY,
+        baseURL: process.env.OPENAI_BASE_URL || defaultOpenAICompatibleBaseURL,
+      };
     case 'anthropic':
       // Default Anthropic base URL mirrors existing routes
       return { apiKey: process.env.ANTHROPIC_API_KEY, baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1' };
@@ -82,7 +87,7 @@ export function getProviderForModel(modelId: string): ProviderResolution {
   if (configured) {
     const { provider, apiKey, baseURL, model } = configured as { provider: ProviderName; apiKey?: string; baseURL?: string; model: string };
     const client = getOrCreateClient(provider, apiKey, baseURL);
-    return { client, actualModel: model };
+    return { provider, client, actualModel: model };
   }
 
   // 2) Fallback logic based on prefixes and special cases
@@ -93,30 +98,29 @@ export function getProviderForModel(modelId: string): ProviderResolution {
 
   if (isKimiGroq) {
     const client = getOrCreateClient('groq');
-    return { client, actualModel: 'moonshotai/kimi-k2-instruct-0905' };
+    return { provider: 'groq', client, actualModel: 'moonshotai/kimi-k2-instruct-0905' };
   }
 
   if (isAnthropic) {
     const client = getOrCreateClient('anthropic');
-    return { client, actualModel: modelId.replace('anthropic/', '') };
+    return { provider: 'anthropic', client, actualModel: modelId.replace('anthropic/', '') };
   }
 
   if (isOpenAI) {
     const client = getOrCreateClient('openai');
-    return { client, actualModel: modelId.replace('openai/', '') };
+    return { provider: 'openai', client, actualModel: modelId.replace('openai/', '') };
   }
 
   if (isGoogle) {
     const client = getOrCreateClient('google');
-    return { client, actualModel: modelId.replace('google/', '') };
+    return { provider: 'google', client, actualModel: modelId.replace('google/', '') };
   }
 
   // Default: use Groq with modelId as-is
   const client = getOrCreateClient('groq');
-  return { client, actualModel: modelId };
+  return { provider: 'groq', client, actualModel: modelId };
 }
 
 export default getProviderForModel;
-
 
 
