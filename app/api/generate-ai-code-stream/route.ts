@@ -11,11 +11,61 @@ import { getProviderForModel } from '@/lib/ai/provider-manager';
 // Force dynamic route to enable streaming
 export const dynamic = 'force-dynamic';
 
-console.log('[generate-ai-code-stream] AI Gateway config:', {
-  isUsingAIGateway: !!process.env.AI_GATEWAY_API_KEY,
-  hasGroqKey: !!process.env.GROQ_API_KEY,
-  hasAIGatewayKey: !!process.env.AI_GATEWAY_API_KEY
+console.log('[generate-ai-code-stream] OpenAI-compatible config:', {
+  hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || 'default-openai-compatible-base-url'
 });
+
+function getErrorMessage(value: unknown): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      return getErrorMessage(parsed) || trimmed;
+    } catch {
+      return trimmed;
+    }
+  }
+
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return (
+      getErrorMessage(record.error) ||
+      getErrorMessage(record.message) ||
+      getErrorMessage(record.cause)
+    );
+  }
+
+  return String(value);
+}
+
+function formatUpstreamError(error: unknown): string {
+  const err = error as Record<string, unknown> | undefined;
+  const detail = getErrorMessage(err?.responseBody)
+    || getErrorMessage(err?.body)
+    || getErrorMessage(err?.cause)
+    || getErrorMessage(err?.message)
+    || getErrorMessage(error)
+    || 'Unknown OpenAI-compatible upstream error';
+
+  const status = err?.statusCode
+    || err?.status
+    || (err?.response as Record<string, unknown> | undefined)?.status;
+
+  return status ? `OpenAI-compatible request failed (${status}): ${detail}` : detail;
+}
 
 // Helper function to analyze user preferences from conversation history
 function analyzeUserPreferences(messages: ConversationMessage[]): {
@@ -1187,16 +1237,9 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         
         // Determine which provider to use based on model
         const { client: modelProvider, actualModel, provider } = getProviderForModel(model);
-        const providerDisplayName = provider === 'openai'
-          ? 'OpenAI-compatible'
-          : provider === 'anthropic'
-            ? 'Anthropic'
-            : provider === 'google'
-              ? 'Google'
-              : 'Groq';
+        const providerDisplayName = 'OpenAI-compatible';
 
         console.log(`[generate-ai-code-stream] Using provider: ${providerDisplayName}, model: ${actualModel}`);
-        console.log(`[generate-ai-code-stream] AI Gateway enabled: ${!!process.env.AI_GATEWAY_API_KEY}`);
         console.log(`[generate-ai-code-stream] Model string: ${model}`);
 
         // Make streaming API call with appropriate provider
@@ -1264,7 +1307,6 @@ It's better to have 3 complete files than 10 incomplete files.`
           ],
           maxTokens: 8192, // Reduce to ensure completion
           stopSequences: [] // Don't stop early
-          // Note: Neither Groq nor Anthropic models support tool/function calling in this context
           // We use XML tags for package detection instead
         };
         
@@ -1292,12 +1334,8 @@ It's better to have 3 complete files than 10 incomplete files.`
             break; // Success, exit retry loop
           } catch (streamError: any) {
             console.error(`[generate-ai-code-stream] Error calling streamText (attempt ${retryCount + 1}/${maxRetries + 1}):`, streamError);
-            
-            // Check if this is a Groq service unavailable error
-            const isGroqServiceError = provider === 'groq' && actualModel === 'moonshotai/kimi-k2-instruct-0905' && streamError.message?.includes('Service unavailable');
-            const isRetryableError = streamError.message?.includes('Service unavailable') || 
-                                    streamError.message?.includes('rate limit') ||
-                                    streamError.message?.includes('timeout');
+            const upstreamError = formatUpstreamError(streamError);
+            const isRetryableError = /service unavailable|rate limit|timeout|temporarily unavailable/i.test(upstreamError);
             
             if (retryCount < maxRetries && isRetryableError) {
               retryCount++;
@@ -1311,31 +1349,14 @@ It's better to have 3 complete files than 10 incomplete files.`
               
               // Wait before retry with exponential backoff
               await new Promise(resolve => setTimeout(resolve, retryCount * 2000));
-              
-              // If Groq fails, try switching to a fallback model
-              if (isGroqServiceError && retryCount === maxRetries) {
-                console.log('[generate-ai-code-stream] Groq service unavailable, falling back to GPT-4');
-                const fallback = getProviderForModel('openai/gpt-4-turbo');
-                streamOptions.model = fallback.client(fallback.actualModel);
-              }
             } else {
-              // Final error, send to user
-              await sendProgress({ 
-                type: 'error', 
-                message: `Failed to initialize ${providerDisplayName} streaming: ${streamError.message}` 
-              });
-              
-              // If this is a Google model error, provide helpful info
-              if (provider === 'google') {
-                await sendProgress({ 
-                  type: 'info', 
-                  message: 'Tip: Make sure your GEMINI_API_KEY is set correctly and has proper permissions.' 
-                });
-              }
-              
-              throw streamError;
+              throw new Error(upstreamError);
             }
           }
+        }
+
+        if (!result) {
+          throw new Error(`Failed to initialize ${providerDisplayName} streaming.`);
         }
         
         // Stream the response and parse in real-time
@@ -1568,6 +1589,14 @@ It's better to have 3 complete files than 10 incomplete files.`
         // Extract explanation
         const explanationMatch = generatedCode.match(/<explanation>([\s\S]*?)<\/explanation>/);
         const explanation = explanationMatch ? explanationMatch[1].trim() : 'Code generated successfully!';
+
+        if (!generatedCode.trim()) {
+          throw new Error('The OpenAI-compatible upstream returned an empty response before any code was generated.');
+        }
+
+        if (files.length === 0) {
+          throw new Error('The OpenAI-compatible upstream finished without generating any <file> blocks.');
+        }
         
         // Validate generated code for truncation issues
         const truncationWarnings: string[] = [];
@@ -1785,6 +1814,7 @@ Provide the complete file content without any truncation. Include all necessary 
         
       } catch (error) {
         console.error('[generate-ai-code-stream] Stream processing error:', error);
+        const formattedError = formatUpstreamError(error);
         
         // Check if it's a tool validation error
         if ((error as any).message?.includes('tool call validation failed')) {
@@ -1797,7 +1827,8 @@ Provide the complete file content without any truncation. Include all necessary 
         } else {
           await sendProgress({ 
             type: 'error', 
-            error: (error as Error).message 
+            error: formattedError,
+            message: formattedError
           });
         }
       } finally {

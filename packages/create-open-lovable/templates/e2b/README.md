@@ -20,6 +20,11 @@ This project is configured to use E2B sandboxes for code execution.
 
 ## Configuration
 
+AI requests use a single OpenAI-compatible runtime path. Configure:
+
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`
+
 You can adjust E2B settings in `config/app.config.ts`:
 
 - `timeoutMinutes`: Sandbox session timeout (default: 15)

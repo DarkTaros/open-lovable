@@ -161,35 +161,26 @@ async function createEnvFile(projectPath, sandbox, answers) {
     envContent += '\n';
   }
   
-  // Optional AI provider keys
-  envContent += `# OPTIONAL - AI Providers\n`;
-  
-  if (answers.anthropicApiKey) {
-    envContent += `ANTHROPIC_API_KEY=${answers.anthropicApiKey}\n`;
-  } else {
-    envContent += `# ANTHROPIC_API_KEY=your_anthropic_api_key_here\n`;
-  }
-  
-  if (answers.openaiApiKey) {
-    envContent += `OPENAI_API_KEY=${answers.openaiApiKey}\n`;
-  } else {
-    envContent += `# OPENAI_API_KEY=your_openai_api_key_here\n`;
-  }
-  
-  if (answers.geminiApiKey) {
-    envContent += `GEMINI_API_KEY=${answers.geminiApiKey}\n`;
-  } else {
-    envContent += `# GEMINI_API_KEY=your_gemini_api_key_here\n`;
-  }
-  
-  if (answers.groqApiKey) {
-    envContent += `GROQ_API_KEY=${answers.groqApiKey}\n`;
-  } else {
-    envContent += `# GROQ_API_KEY=your_groq_api_key_here\n`;
-  }
+  // Required OpenAI-compatible runtime keys
+  envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
+  envContent += `OPENAI_API_KEY=${answers.openaiApiKey || 'your_openai_compatible_api_key_here'}\n`;
+  envContent += `OPENAI_BASE_URL=${answers.openaiBaseUrl || 'https://a.ah-api.com/v1'}\n`;
+  envContent += `\n# Deprecated and no longer used at runtime:\n`;
+  envContent += `# AI_GATEWAY_API_KEY=\n`;
+  envContent += `# ANTHROPIC_API_KEY=\n`;
+  envContent += `# GEMINI_API_KEY=\n`;
+  envContent += `# GROQ_API_KEY=\n`;
   
   await fs.writeFile(path.join(projectPath, '.env'), envContent);
-  await fs.writeFile(path.join(projectPath, '.env.example'), envContent.replace(/=.+/g, '=your_key_here'));
+  const envExampleContent = envContent
+    .replace(/FIRECRAWL_API_KEY=.*/g, 'FIRECRAWL_API_KEY=your_firecrawl_api_key_here')
+    .replace(/E2B_API_KEY=.*/g, 'E2B_API_KEY=your_e2b_api_key_here')
+    .replace(/VERCEL_TEAM_ID=.*/g, 'VERCEL_TEAM_ID=your_team_id')
+    .replace(/VERCEL_PROJECT_ID=.*/g, 'VERCEL_PROJECT_ID=your_project_id')
+    .replace(/VERCEL_TOKEN=.*/g, 'VERCEL_TOKEN=your_access_token')
+    .replace(/OPENAI_API_KEY=.*/g, 'OPENAI_API_KEY=your_openai_compatible_api_key_here')
+    .replace(/OPENAI_BASE_URL=.*/g, 'OPENAI_BASE_URL=https://a.ah-api.com/v1');
+  await fs.writeFile(path.join(projectPath, '.env.example'), envExampleContent);
 }
 
 async function createEnvExample(projectPath, sandbox) {
@@ -215,15 +206,14 @@ async function createEnvExample(projectPath, sandbox) {
     envContent += `VERCEL_TOKEN=your_access_token\n\n`;
   }
   
-  envContent += `# OPTIONAL - AI Providers (need at least one)\n`;
-  envContent += `# Get yours at https://console.anthropic.com\n`;
-  envContent += `ANTHROPIC_API_KEY=your_anthropic_api_key_here\n\n`;
-  envContent += `# Get yours at https://platform.openai.com\n`;
-  envContent += `OPENAI_API_KEY=your_openai_api_key_here\n\n`;
-  envContent += `# Get yours at https://aistudio.google.com/app/apikey\n`;
-  envContent += `GEMINI_API_KEY=your_gemini_api_key_here\n\n`;
-  envContent += `# Get yours at https://console.groq.com\n`;
-  envContent += `GROQ_API_KEY=your_groq_api_key_here\n`;
+  envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
+  envContent += `OPENAI_API_KEY=your_openai_compatible_api_key_here\n`;
+  envContent += `OPENAI_BASE_URL=https://a.ah-api.com/v1\n\n`;
+  envContent += `# Deprecated and no longer used at runtime:\n`;
+  envContent += `# AI_GATEWAY_API_KEY=\n`;
+  envContent += `# ANTHROPIC_API_KEY=\n`;
+  envContent += `# GEMINI_API_KEY=\n`;
+  envContent += `# GROQ_API_KEY=\n`;
   
   await fs.writeFile(path.join(projectPath, '.env.example'), envContent);
 }

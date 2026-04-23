@@ -137,53 +137,29 @@ export function getEnvPrompts(provider) {
     });
   }
 
-  // Optional AI provider keys
-  prompts.push({
-    type: 'confirm',
-    name: 'addAiKeys',
-    message: 'Would you like to add AI provider API keys?',
-    default: true
-  });
-
-  prompts.push({
-    type: 'checkbox',
-    name: 'aiProviders',
-    message: 'Select AI providers to configure:',
-    when: (answers) => answers.addAiKeys,
-    choices: [
-      { name: 'Anthropic (Claude)', value: 'anthropic' },
-      { name: 'OpenAI (GPT)', value: 'openai' },
-      { name: 'Google (Gemini)', value: 'gemini' },
-      { name: 'Groq', value: 'groq' }
-    ]
-  });
-
-  prompts.push({
-    type: 'input',
-    name: 'anthropicApiKey',
-    message: 'Anthropic API key:',
-    when: (answers) => answers.aiProviders && answers.aiProviders.includes('anthropic')
-  });
-
   prompts.push({
     type: 'input',
     name: 'openaiApiKey',
-    message: 'OpenAI API key:',
-    when: (answers) => answers.aiProviders && answers.aiProviders.includes('openai')
+    message: 'OpenAI-compatible API key:',
+    validate: (input) => {
+      if (!input || input.trim() === '') {
+        return 'OpenAI-compatible API key is required';
+      }
+      return true;
+    }
   });
 
   prompts.push({
     type: 'input',
-    name: 'geminiApiKey',
-    message: 'Gemini API key:',
-    when: (answers) => answers.aiProviders && answers.aiProviders.includes('gemini')
-  });
-
-  prompts.push({
-    type: 'input',
-    name: 'groqApiKey',
-    message: 'Groq API key:',
-    when: (answers) => answers.aiProviders && answers.aiProviders.includes('groq')
+    name: 'openaiBaseUrl',
+    message: 'OpenAI-compatible base URL:',
+    default: 'https://a.ah-api.com/v1',
+    validate: (input) => {
+      if (!input || input.trim() === '') {
+        return 'OpenAI-compatible base URL is required';
+      }
+      return true;
+    }
   });
 
   return prompts;

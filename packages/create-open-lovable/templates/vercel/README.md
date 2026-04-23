@@ -35,6 +35,11 @@ When running in a Vercel environment, authentication happens automatically via O
 
 ## Configuration
 
+AI requests use a single OpenAI-compatible runtime path. Configure:
+
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`
+
 You can adjust Vercel settings in `config/app.config.ts`:
 
 - `maxDuration`: Sandbox session timeout (default: 5 minutes)

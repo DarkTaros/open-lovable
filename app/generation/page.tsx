@@ -1815,6 +1815,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
       let generatedCode = '';
       let explanation = '';
       let buffer = ''; // Buffer for incomplete lines
+      let streamErrorMessage: string | null = null;
       
       if (reader) {
         while (true) {
@@ -1831,9 +1832,20 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              let data;
               try {
-                const data = JSON.parse(line.slice(6));
-                
+                data = JSON.parse(line.slice(6));
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+                continue;
+              }
+
+              if (data.type === 'error') {
+                streamErrorMessage = data.error || data.message || 'Failed to generate recreation';
+                break;
+              }
+
+              try {
                 if (data.type === 'status') {
                   setGenerationProgress(prev => ({ ...prev, status: data.message }));
                 } else if (data.type === 'thinking') {
@@ -2035,15 +2047,22 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                     // Keep the files that were already parsed during streaming
                     files: prev.files.length > 0 ? prev.files : parsedFiles
                   }));
-                } else if (data.type === 'error') {
-                  throw new Error(data.error);
                 }
               } catch (e) {
-                console.error('Failed to parse SSE data:', e);
+                console.error('Failed to handle SSE data:', e);
               }
             }
           }
+
+          if (streamErrorMessage) {
+            await reader.cancel();
+            break;
+          }
         }
+      }
+
+      if (streamErrorMessage) {
+        throw new Error(streamErrorMessage);
       }
       
       if (generatedCode) {
@@ -3036,6 +3055,7 @@ Focus on the key sections and content, making it clean and modern.`;
         const decoder = new TextDecoder();
         let generatedCode = '';
         let explanation = '';
+        let streamErrorMessage: string | null = null;
         
         while (true) {
           const { done, value } = await reader.read();
@@ -3046,9 +3066,20 @@ Focus on the key sections and content, making it clean and modern.`;
           
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              let data;
               try {
-                const data = JSON.parse(line.slice(6));
-                
+                data = JSON.parse(line.slice(6));
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+                continue;
+              }
+
+              if (data.type === 'error') {
+                streamErrorMessage = data.error || data.message || 'Failed to generate recreation';
+                break;
+              }
+
+              try {
                 if (data.type === 'status') {
                   setGenerationProgress(prev => ({ ...prev, status: data.message }));
                 } else if (data.type === 'thinking') {
@@ -3183,10 +3214,19 @@ Focus on the key sections and content, making it clean and modern.`;
                   }));
                 }
               } catch (e) {
-                console.error('Failed to parse SSE data:', e);
+                console.error('Failed to handle SSE data:', e);
               }
             }
           }
+
+          if (streamErrorMessage) {
+            await reader.cancel();
+            break;
+          }
+        }
+
+        if (streamErrorMessage) {
+          throw new Error(streamErrorMessage);
         }
         
         setGenerationProgress(prev => ({
