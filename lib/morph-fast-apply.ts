@@ -1,4 +1,6 @@
-// Using direct fetch to Morph's OpenAI-compatible API to avoid SDK type issues
+import { appConfig } from '@/config/app.config';
+
+// Use the same OpenAI-compatible runtime as the rest of the app for fast apply edits.
 
 export interface MorphEditBlock {
   targetFile: string;
@@ -40,18 +42,20 @@ export function normalizeProjectPath(inputPath: string): { normalizedPath: strin
 }
 
 async function morphChatCompletionsCreate(payload: any) {
-  if (!process.env.MORPH_API_KEY) throw new Error('MORPH_API_KEY is not set');
-  const res = await fetch('https://api.morphllm.com/v1/chat/completions', {
+  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is not set');
+
+  const baseURL = (process.env.OPENAI_BASE_URL || 'https://a.ah-api.com/v1').replace(/\/$/, '');
+  const res = await fetch(`${baseURL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.MORPH_API_KEY}`
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Morph API error ${res.status}: ${text}`);
+    throw new Error(`OpenAI-compatible API error ${res.status}: ${text}`);
   }
   return res.json();
 }
@@ -184,8 +188,8 @@ export async function applyMorphEditToFile(params: {
   updateSnippet: string;
 }): Promise<MorphApplyResult> {
   try {
-    if (!process.env.MORPH_API_KEY) {
-      return { success: false, error: 'MORPH_API_KEY not set' };
+    if (!process.env.OPENAI_API_KEY) {
+      return { success: false, error: 'OPENAI_API_KEY not set' };
     }
 
     const { normalizedPath, fullPath } = normalizeProjectPath(params.targetPath);
@@ -194,7 +198,7 @@ export async function applyMorphEditToFile(params: {
     const initialCode = await readFileFromSandbox(params.sandbox, normalizedPath, fullPath);
 
     const resp = await morphChatCompletionsCreate({
-      model: 'morph-v3-large',
+      model: appConfig.ai.defaultModel.replace('openai/', ''),
       messages: [
         {
           role: 'user',
@@ -205,7 +209,7 @@ export async function applyMorphEditToFile(params: {
 
     const mergedCode = (resp as any)?.choices?.[0]?.message?.content || '';
     if (!mergedCode) {
-      return { success: false, error: 'Morph returned empty content', normalizedPath };
+      return { success: false, error: 'Fast apply returned empty content', normalizedPath };
     }
 
     await writeFileToSandbox(params.sandbox, normalizedPath, fullPath, mergedCode);
@@ -215,5 +219,4 @@ export async function applyMorphEditToFile(params: {
     return { success: false, error: (error as Error).message };
   }
 }
-
 

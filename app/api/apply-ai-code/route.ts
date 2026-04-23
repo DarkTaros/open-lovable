@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseMorphEdits, applyMorphEditToFile } from '@/lib/morph-fast-apply';
+import { appConfig } from '@/config/app.config';
 import type { SandboxState } from '@/types/sandbox';
 import type { ConversationState } from '@/types/conversation';
 
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     
     // Parse the AI response
     const parsed = parseAIResponse(response);
-    const morphEnabled = Boolean(isEdit && process.env.MORPH_API_KEY);
+    const morphEnabled = Boolean(isEdit && process.env.OPENAI_API_KEY);
     const morphEdits = morphEnabled ? parseMorphEdits(response) : [];
     console.log('[apply-ai-code] Morph Fast Apply mode:', morphEnabled);
     if (morphEnabled) {
@@ -733,7 +734,7 @@ body {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               missingImports,
-              model: 'claude-sonnet-4-20250514'
+              model: appConfig.ai.defaultModel
             })
           }
         );

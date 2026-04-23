@@ -40,7 +40,7 @@ interface SearchResult {
 export default function HomePage() {
   const [url, setUrl] = useState<string>("");
   const [selectedStyle, setSelectedStyle] = useState<string>("1");
-  const [selectedModel, setSelectedModel] = useState<string>(appConfig.ai.defaultModel);
+  const selectedModel = appConfig.ai.defaultModel;
   const [isValidUrl, setIsValidUrl] = useState<boolean>(false);
   const [showSearchTiles, setShowSearchTiles] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -77,11 +77,6 @@ export default function HomePage() {
     { id: "7", name: "3D Depth", description: "Dimensional layers" },
     { id: "8", name: "Retro Wave", description: "80s inspired" },
   ];
-
-  const models = appConfig.ai.availableModels.map(model => ({
-    id: model,
-    name: appConfig.ai.modelDisplayNames[model] || model,
-  }));
 
   const handleSubmit = async (selectedResult?: SearchResult) => {
     const inputValue = url.trim();
@@ -525,18 +520,11 @@ export default function HomePage() {
                       <div className={`flex items-center gap-3 mt-2 pb-4 transition-all duration-300 transform ${
                         isValidUrl ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
                       }`} style={{ transitionDelay: '400ms' }}>
-                        {/* Model Dropdown */}
-                        <select
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          className={`px-3 py-2.5 text-xs font-medium text-gray-700 bg-white rounded border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 ${extendBrandStyles ? 'flex-1' : ''}`}
-                        >
-                          {models.map((model) => (
-                            <option key={model.id} value={model.id}>
-                              {model.name}
-                            </option>
-                          ))}
-                        </select>
+                        {!extendBrandStyles && (
+                          <div className="px-3 py-2.5 text-xs font-medium text-gray-500 bg-gray-50 rounded border border-gray-200">
+                            AI Model: {appConfig.ai.modelDisplayNames[selectedModel] || selectedModel}
+                          </div>
+                        )}
 
                         {/* Additional Instructions - Hidden when extend brand styles is enabled */}
                         {!extendBrandStyles && (

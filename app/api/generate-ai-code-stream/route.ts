@@ -5,7 +5,7 @@ import { selectFilesForEdit, getFileContents, formatFilesForAI } from '@/lib/con
 import { executeSearchPlan, formatSearchResultsForAI, selectTargetFile } from '@/lib/file-search-executor';
 import { FileManifest } from '@/types/file-manifest';
 import type { ConversationState, ConversationMessage, ConversationEdit } from '@/types/conversation';
-import { appConfig } from '@/config/app.config';
+import { appConfig, resolveAiModel } from '@/config/app.config';
 import { createOpenAICompatibleProviderOptions, getProviderForModel } from '@/lib/ai/provider-manager';
 
 // Force dynamic route to enable streaming
@@ -114,6 +114,7 @@ declare global {
 export async function POST(request: NextRequest) {
   try {
     const { prompt, model = appConfig.ai.defaultModel, context, isEdit = false } = await request.json();
+    const resolvedModel = resolveAiModel(model);
     
     console.log('[generate-ai-code-stream] Received request:');
     console.log('[generate-ai-code-stream] - prompt:', prompt);
@@ -950,8 +951,8 @@ CRITICAL: When files are provided in the context:
 4. Do NOT ask to see files - they are already provided in the context above
 5. Make the requested change immediately`;
 
-        // If Morph Fast Apply is enabled (edit mode + MORPH_API_KEY), force <edit> block output
-        const morphFastApplyEnabled = Boolean(isEdit && process.env.MORPH_API_KEY);
+        // If fast apply is enabled for edits, force <edit> block output.
+        const morphFastApplyEnabled = Boolean(isEdit && process.env.OPENAI_API_KEY);
         if (morphFastApplyEnabled) {
           systemPrompt += `
 
@@ -1236,11 +1237,11 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         const packagesToInstall: string[] = [];
         
         // Determine which provider to use based on model
-        const { client: modelProvider, actualModel, provider } = getProviderForModel(model);
+        const { client: modelProvider, actualModel } = getProviderForModel(resolvedModel);
         const providerDisplayName = 'OpenAI-compatible';
 
         console.log(`[generate-ai-code-stream] Using provider: ${providerDisplayName}, model: ${actualModel}`);
-        console.log(`[generate-ai-code-stream] Model string: ${model}`);
+        console.log(`[generate-ai-code-stream] Model string: ${resolvedModel}`);
 
         // Make streaming API call with appropriate provider
         const systemInstructions = systemPrompt + `
@@ -1283,7 +1284,7 @@ REMEMBER: It's better to generate fewer COMPLETE files than many INCOMPLETE file
           model: modelProvider(actualModel),
           providerOptions: createOpenAICompatibleProviderOptions({
             instructions: systemInstructions,
-            reasoningEffort: provider === 'openai' && actualModel.startsWith('gpt-5') ? 'high' : undefined,
+            reasoningEffort: 'high',
           }),
           messages: [
             { 
@@ -1311,11 +1312,6 @@ It's better to have 3 complete files than 10 incomplete files.`
           stopSequences: [] // Don't stop early
           // We use XML tags for package detection instead
         };
-        
-        // Add temperature for non-reasoning models
-        if (!(provider === 'openai' && actualModel.startsWith('gpt-5'))) {
-          streamOptions.temperature = 0.7;
-        }
         
         let result;
         let retryCount = 0;
@@ -1705,17 +1701,17 @@ Provide the complete file content without any truncation. Include all necessary 
                 
                 // Make a focused API call to complete this specific file
                 // Create a new client for the completion based on the provider
-                const { client: completionClient, actualModel: completionModelName } = getProviderForModel(model);
+                const { client: completionClient, actualModel: completionModelName } = getProviderForModel(resolvedModel);
                 
                 const completionResult = await streamText({
                   model: completionClient(completionModelName),
                   providerOptions: createOpenAICompatibleProviderOptions({
-                    instructions: 'You are completing a truncated file. Provide the complete, working file content.'
+                    instructions: 'You are completing a truncated file. Provide the complete, working file content.',
+                    reasoningEffort: 'high'
                   }),
                   messages: [
                     { role: 'user', content: completionPrompt }
-                  ],
-                  temperature: model.startsWith('openai/gpt-5') ? undefined : appConfig.ai.defaultTemperature
+                  ]
                 });
                 
                 // Get the full text from the stream

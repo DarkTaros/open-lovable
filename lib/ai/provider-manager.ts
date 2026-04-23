@@ -1,4 +1,4 @@
-import { appConfig } from '@/config/app.config';
+import { resolveAiModel } from '@/config/app.config';
 import { createOpenAI } from '@ai-sdk/openai';
 
 type ProviderName = 'openai';
@@ -46,30 +46,10 @@ function getOrCreateClient(apiKey?: string, baseURL?: string): ProviderClient {
 }
 
 function getActualModel(modelId: string): string {
-  if (modelId.startsWith('openai/')) {
-    return modelId.replace('openai/', '');
-  }
-
-  if (modelId.startsWith('anthropic/')) {
-    return modelId.replace('anthropic/', '');
-  }
-
-  if (modelId.startsWith('google/')) {
-    return modelId.replace('google/', '');
-  }
-
-  return modelId;
+  return resolveAiModel(modelId).replace('openai/', '');
 }
 
 export function getProviderForModel(modelId: string): ProviderResolution {
-  // 1) Check explicit model configuration in app config (custom models)
-  const configured = appConfig.ai.modelApiConfig?.[modelId as keyof typeof appConfig.ai.modelApiConfig];
-  if (configured) {
-    const { apiKey, baseURL, model } = configured as { provider?: string; apiKey?: string; baseURL?: string; model: string };
-    const client = getOrCreateClient(apiKey, baseURL);
-    return { provider: 'openai', client, actualModel: model };
-  }
-
   const client = getOrCreateClient();
   return {
     provider: 'openai',

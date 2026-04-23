@@ -12,7 +12,6 @@ interface SidebarInputProps {
 export default function SidebarInput({ onSubmit, disabled = false }: SidebarInputProps) {
   const [url, setUrl] = useState<string>("");
   const [selectedStyle, setSelectedStyle] = useState<string>("1");
-  const [selectedModel, setSelectedModel] = useState<string>(appConfig.ai.defaultModel);
   const [additionalInstructions, setAdditionalInstructions] = useState<string>("");
   const [isValidUrl, setIsValidUrl] = useState<boolean>(false);
 
@@ -34,16 +33,11 @@ export default function SidebarInput({ onSubmit, disabled = false }: SidebarInpu
     { id: "8", name: "Retro Wave", description: "80s inspired" },
   ];
 
-  const models = appConfig.ai.availableModels.map(model => ({
-    id: model,
-    name: appConfig.ai.modelDisplayNames[model] || model,
-  }));
-
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!url.trim() || disabled) return;
 
-    onSubmit(url.trim(), selectedStyle, selectedModel, additionalInstructions || undefined);
+    onSubmit(url.trim(), selectedStyle, appConfig.ai.defaultModel, additionalInstructions || undefined);
 
     // Reset form
     setUrl("");
@@ -90,21 +84,11 @@ export default function SidebarInput({ onSubmit, disabled = false }: SidebarInpu
               </div>
             </div>
 
-            {/* Model Selector */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">AI Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                disabled={disabled}
-                className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-white rounded border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-              >
-                {models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 rounded border border-gray-200">
+                {appConfig.ai.modelDisplayNames[appConfig.ai.defaultModel] || appConfig.ai.defaultModel}
+              </div>
             </div>
 
             {/* Additional Instructions */}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { appConfig } from '@/config/app.config';
+import { appConfig, resolveAiModel } from '@/config/app.config';
 import HeroInput from '@/components/HeroInput';
 import SidebarInput from '@/components/app/generation/SidebarInput';
 import HeaderBrandKit from '@/components/shared/header/BrandKit/BrandKit';
@@ -79,8 +79,7 @@ function AISandboxPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [aiModel, setAiModel] = useState(() => {
-    const modelParam = searchParams.get('model');
-    return appConfig.ai.availableModels.includes(modelParam || '') ? modelParam! : appConfig.ai.defaultModel;
+    return resolveAiModel(searchParams.get('model'));
   });
   const [urlOverlayVisible, setUrlOverlayVisible] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -230,9 +229,7 @@ function AISandboxPage() {
           setHomeContextInput(storedInstructions);
         }
         
-        if (storedModel) {
-          setAiModel(storedModel);
-        }
+        setAiModel(resolveAiModel(storedModel));
         
         // Skip the home screen and go directly to builder
         setShowHomeScreen(false);
@@ -3324,27 +3321,32 @@ Focus on the key sections and content, making it clean and modern.`;
       <div className="bg-white py-[15px] py-[8px] border-b border-border-faint flex items-center justify-between shadow-sm">
         <HeaderBrandKit />
         <div className="flex items-center gap-2">
-          {/* Model Selector - Left side */}
-          <select
-            value={aiModel}
-            onChange={(e) => {
-              const newModel = e.target.value;
-              setAiModel(newModel);
-              const params = new URLSearchParams(searchParams);
-              params.set('model', newModel);
-              if (sandboxData?.sandboxId) {
-                params.set('sandbox', sandboxData.sandboxId);
-              }
-              router.push(`/generation?${params.toString()}`);
-            }}
-            className="px-3 py-1.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-300 transition-colors"
-          >
-            {appConfig.ai.availableModels.map(model => (
-              <option key={model} value={model}>
-                {appConfig.ai.modelDisplayNames?.[model] || model}
-              </option>
-            ))}
-          </select>
+          {appConfig.ui.showModelSelector && appConfig.ai.availableModels.length > 1 ? (
+            <select
+              value={aiModel}
+              onChange={(e) => {
+                const newModel = resolveAiModel(e.target.value);
+                setAiModel(newModel);
+                const params = new URLSearchParams(searchParams);
+                params.set('model', newModel);
+                if (sandboxData?.sandboxId) {
+                  params.set('sandbox', sandboxData.sandboxId);
+                }
+                router.push(`/generation?${params.toString()}`);
+              }}
+              className="px-3 py-1.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-300 transition-colors"
+            >
+              {appConfig.ai.availableModels.map(model => (
+                <option key={model} value={model}>
+                  {appConfig.ai.modelDisplayNames?.[model] || model}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="px-3 py-1.5 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+              {appConfig.ai.modelDisplayNames?.[aiModel] || aiModel}
+            </div>
+          )}
           <button 
             onClick={() => createSandbox()}
             className="p-8 rounded-lg transition-colors bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100"

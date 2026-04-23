@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { appConfig } from '@/config/app.config';
+import { appConfig, resolveAiModel } from '@/config/app.config';
 import { createOpenAICompatibleProviderOptions, getProviderForModel } from '@/lib/ai/provider-manager';
 // import type { FileManifest } from '@/types/file-manifest'; // Type is used implicitly through manifest parameter
 
@@ -36,10 +36,11 @@ const searchPlanSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const { prompt, manifest, model = appConfig.ai.defaultModel } = await request.json();
+    const resolvedModel = resolveAiModel(model);
     
     console.log('[analyze-edit-intent] Request received');
     console.log('[analyze-edit-intent] Prompt:', prompt);
-    console.log('[analyze-edit-intent] Model:', model);
+    console.log('[analyze-edit-intent] Model:', resolvedModel);
     console.log('[analyze-edit-intent] Manifest files count:', manifest?.files ? Object.keys(manifest.files).length : 0);
     
     if (!prompt || !manifest) {
@@ -78,10 +79,10 @@ export async function POST(request: NextRequest) {
     console.log('[analyze-edit-intent] File summary preview:', fileSummary.split('\n').slice(0, 5).join('\n'));
     
     // Select the appropriate AI model based on the request
-    const { client, actualModel, provider } = getProviderForModel(model);
+    const { client, actualModel, provider } = getProviderForModel(resolvedModel);
     const aiModel = client(actualModel);
     
-    console.log('[analyze-edit-intent] Using AI model:', model);
+    console.log('[analyze-edit-intent] Using AI model:', resolvedModel);
     console.log('[analyze-edit-intent] Resolved provider:', provider, 'actual model:', actualModel);
     
     // Use AI to create a search plan

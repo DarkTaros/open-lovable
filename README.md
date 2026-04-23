@@ -28,11 +28,6 @@ OPENAI_API_KEY=your_openai_compatible_api_key
 OPENAI_BASE_URL=https://a.ah-api.com/v1
 
 # =================================================================
-# FAST APPLY (Optional - for faster edits)
-# =================================================================
-MORPH_API_KEY=your_morphllm_api_key    # https://morphllm.com/dashboard
-
-# =================================================================
 # SANDBOX PROVIDER - Choose ONE: Vercel (default) or E2B
 # =================================================================
 SANDBOX_PROVIDER=vercel  # or 'e2b'
@@ -62,12 +57,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## OpenAI-Compatible Routing
 
-The project now uses a single OpenAI-compatible runtime path for every selectable model in the UI, including:
-
-- `openai/gpt-5.4`
-- `moonshotai/kimi-k2-instruct-0905`
-- `anthropic/claude-sonnet-4-20250514`
-- `google/gemini-3-pro-preview`
+The project now uses a single OpenAI-compatible runtime path with `openai/gpt-5.4` as the only application model.
 
 Set these two variables to use your compatible endpoint:
 
@@ -76,9 +66,9 @@ OPENAI_API_KEY=your_openai_compatible_api_key
 OPENAI_BASE_URL=https://a.ah-api.com/v1
 ```
 
-If your gateway does not recognize one of those model IDs, the upstream error is returned directly in the UI. Legacy variables such as `AI_GATEWAY_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and `GROQ_API_KEY` are no longer used by the main runtime path.
+Legacy variables such as `AI_GATEWAY_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, and `MORPH_API_KEY` are no longer used by the main runtime path.
 
-The default model is `openai/gpt-5.4`. If your provider exposes a different model name, update the model selection in the UI or adjust [app.config.ts](/Volumes/T9/open-lovable/config/app.config.ts).
+The application model is fixed to `openai/gpt-5.4`. If your provider exposes a different upstream model identifier, adjust [app.config.ts](/Volumes/T9/open-lovable/config/app.config.ts).
 
 ## License
 

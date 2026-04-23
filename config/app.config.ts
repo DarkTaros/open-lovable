@@ -54,30 +54,12 @@ export const appConfig = {
     defaultModel: "openai/gpt-5.4",
 
     // Available model IDs exposed in the UI.
-    // All runtime requests are sent through the same OpenAI-compatible client.
-    availableModels: [
-      "openai/gpt-5.4",
-      "moonshotai/kimi-k2-instruct-0905",
-      "anthropic/claude-sonnet-4-20250514",
-      "google/gemini-3-pro-preview",
-    ],
+    availableModels: ["openai/gpt-5.4"],
 
     // User-facing model labels.
-    // Keep the existing model identities, but do not imply direct provider-specific routing.
     modelDisplayNames: {
-      "openai/gpt-5.4": "GPT-5.4 (OpenAI Compatible)",
-      "moonshotai/kimi-k2-instruct-0905": "Kimi K2 (OpenAI Compatible)",
-      "anthropic/claude-sonnet-4-20250514": "Claude Sonnet 4 (OpenAI Compatible)",
-      "google/gemini-3-pro-preview": "Gemini 3 Pro Preview (OpenAI Compatible)",
+      "openai/gpt-5.4": "GPT-5.4",
     } as Record<string, string>,
-
-    // Optional per-model overrides for an OpenAI-compatible endpoint.
-    modelApiConfig: {
-      "moonshotai/kimi-k2-instruct-0905": {
-        provider: "openai",
-        model: "moonshotai/kimi-k2-instruct-0905",
-      },
-    },
 
     // Temperature settings for non-reasoning models
     defaultTemperature: 0.7,
@@ -107,7 +89,7 @@ export const appConfig = {
   // UI Configuration
   ui: {
     // Show/hide certain UI elements
-    showModelSelector: true,
+    showModelSelector: false,
     showStatusIndicator: true,
 
     // Animation durations (milliseconds)
@@ -202,6 +184,13 @@ export function getConfig<K extends keyof typeof appConfig>(
   key: K,
 ): (typeof appConfig)[K] {
   return appConfig[key];
+}
+
+export function resolveAiModel(model?: string | null): string {
+  const normalizedModel = model?.trim();
+  return normalizedModel && appConfig.ai.availableModels.includes(normalizedModel)
+    ? normalizedModel
+    : appConfig.ai.defaultModel;
 }
 
 // Helper to get nested config values
