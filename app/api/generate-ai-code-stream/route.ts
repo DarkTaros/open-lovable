@@ -6,7 +6,7 @@ import { executeSearchPlan, formatSearchResultsForAI, selectTargetFile } from '@
 import { FileManifest } from '@/types/file-manifest';
 import type { ConversationState, ConversationMessage, ConversationEdit } from '@/types/conversation';
 import { appConfig } from '@/config/app.config';
-import { getProviderForModel } from '@/lib/ai/provider-manager';
+import { createOpenAICompatibleProviderOptions, getProviderForModel } from '@/lib/ai/provider-manager';
 
 // Force dynamic route to enable streaming
 export const dynamic = 'force-dynamic';
@@ -1243,12 +1243,7 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         console.log(`[generate-ai-code-stream] Model string: ${model}`);
 
         // Make streaming API call with appropriate provider
-        const streamOptions: any = {
-          model: modelProvider(actualModel),
-          messages: [
-            { 
-              role: 'system', 
-              content: systemPrompt + `
+        const systemInstructions = systemPrompt + `
 
 🚨 CRITICAL CODE GENERATION RULES - VIOLATION = FAILURE 🚨:
 1. NEVER truncate ANY code - ALWAYS write COMPLETE files
@@ -1282,8 +1277,15 @@ Examples of CORRECT CODE (ALWAYS DO THIS):
 ✅ const title = "Welcome to our application"
 ✅ import { useState, useEffect, useCallback } from 'react'
 
-REMEMBER: It's better to generate fewer COMPLETE files than many INCOMPLETE files.`
-            },
+REMEMBER: It's better to generate fewer COMPLETE files than many INCOMPLETE files.`;
+
+        const streamOptions: any = {
+          model: modelProvider(actualModel),
+          providerOptions: createOpenAICompatibleProviderOptions({
+            instructions: systemInstructions,
+            reasoningEffort: provider === 'openai' && actualModel.startsWith('gpt-5') ? 'high' : undefined,
+          }),
+          messages: [
             { 
               role: 'user', 
               content: fullPrompt + `
@@ -1313,15 +1315,6 @@ It's better to have 3 complete files than 10 incomplete files.`
         // Add temperature for non-reasoning models
         if (!(provider === 'openai' && actualModel.startsWith('gpt-5'))) {
           streamOptions.temperature = 0.7;
-        }
-        
-        // Add reasoning effort for GPT-5 models
-        if (provider === 'openai' && actualModel.startsWith('gpt-5')) {
-          streamOptions.experimental_providerMetadata = {
-            openai: {
-              reasoningEffort: 'high'
-            }
-          };
         }
         
         let result;
@@ -1716,11 +1709,10 @@ Provide the complete file content without any truncation. Include all necessary 
                 
                 const completionResult = await streamText({
                   model: completionClient(completionModelName),
+                  providerOptions: createOpenAICompatibleProviderOptions({
+                    instructions: 'You are completing a truncated file. Provide the complete, working file content.'
+                  }),
                   messages: [
-                    { 
-                      role: 'system', 
-                      content: 'You are completing a truncated file. Provide the complete, working file content.'
-                    },
                     { role: 'user', content: completionPrompt }
                   ],
                   temperature: model.startsWith('openai/gpt-5') ? undefined : appConfig.ai.defaultTemperature

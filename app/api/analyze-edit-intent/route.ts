@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { appConfig } from '@/config/app.config';
-import { getProviderForModel } from '@/lib/ai/provider-manager';
+import { createOpenAICompatibleProviderOptions, getProviderForModel } from '@/lib/ai/provider-manager';
 // import type { FileManifest } from '@/types/file-manifest'; // Type is used implicitly through manifest parameter
 
 // Schema for the AI's search plan - not file selection!
@@ -85,13 +85,7 @@ export async function POST(request: NextRequest) {
     console.log('[analyze-edit-intent] Resolved provider:', provider, 'actual model:', actualModel);
     
     // Use AI to create a search plan
-    const result = await generateObject({
-      model: aiModel,
-      schema: searchPlanSchema,
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert at planning code searches. Your job is to create a search strategy to find the exact code that needs to be edited.
+    const systemInstructions = `You are an expert at planning code searches. Your job is to create a search strategy to find the exact code that needs to be edited.
 
 DO NOT GUESS which files to edit. Instead, provide specific search terms that will locate the code.
 
@@ -118,8 +112,15 @@ SEARCH STRATEGY RULES:
    - Add regex patterns for structural searches
 
 Current project structure for context:
-${fileSummary}`
-        },
+${fileSummary}`;
+
+    const result = await generateObject({
+      model: aiModel,
+      schema: searchPlanSchema,
+      providerOptions: createOpenAICompatibleProviderOptions({
+        instructions: systemInstructions,
+      }),
+      messages: [
         {
           role: 'user',
           content: `User request: "${prompt}"

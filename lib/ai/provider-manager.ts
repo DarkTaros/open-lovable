@@ -12,6 +12,8 @@ export interface ProviderResolution {
   actualModel: string;
 }
 
+export type OpenAICompatibleProviderOptions = any;
+
 export const defaultOpenAICompatibleBaseURL = 'https://a.ah-api.com/v1';
 
 // Cache provider clients by a stable key to avoid recreating
@@ -76,5 +78,23 @@ export function getProviderForModel(modelId: string): ProviderResolution {
   };
 }
 
-export default getProviderForModel;
+export function createOpenAICompatibleProviderOptions(options: {
+  instructions?: string;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+}): OpenAICompatibleProviderOptions | undefined {
+  const instructions = options.instructions?.trim();
+  const reasoningEffort = options.reasoningEffort;
 
+  if (!instructions && !reasoningEffort) {
+    return undefined;
+  }
+
+  return {
+    openai: {
+      ...(instructions ? { instructions } : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+    },
+  };
+}
+
+export default getProviderForModel;
