@@ -57,6 +57,3 @@ e2b-template-*
 repomix-output.txt
 bun.lockb
 .env*.local
-
-#deploy
-deploy/OpenSandbox

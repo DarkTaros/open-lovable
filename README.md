@@ -6,7 +6,8 @@ Chat with AI to build React apps instantly. An example app made by the [Firecraw
 
 ## opensandbox deploy
 
-cd deploy/OpenSandbox/server
+git clone https://github.com/alibaba/OpenSandbox
+cd OpenSandbox/server
 python3 -m venv .venv
 uv sync
 source .venv/bin/activate
@@ -16,7 +17,7 @@ opensandbox-server init-config .sandbox.toml --example docker
 
 opensandbox-server --config .sandbox.toml
 
-### try curl http://127.0.0.1:8081/health
+### try curl http://127.0.0.1:8080/health
 
 ## Setup
 
