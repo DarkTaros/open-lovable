@@ -1,6 +1,6 @@
-# Open Lovable with OpenSandbox
+# Novable with OpenSandbox
 
-This template configures Open Lovable to run generated apps in OpenSandbox.
+This template configures Novable to run generated apps in OpenSandbox.
 
 ## Setup
 

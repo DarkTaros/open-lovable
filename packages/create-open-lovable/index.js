@@ -15,8 +15,8 @@ const __dirname = path.dirname(__filename);
 const program = new Command();
 
 program
-  .name('create-open-lovable')
-  .description('Create a new Open Lovable project with OpenSandbox')
+  .name('create-Novable')
+  .description('Create a new Novable project with OpenSandbox')
   .version('1.0.0')
   .option('-s, --sandbox <provider>', 'Sandbox provider (opensandbox)')
   .option('-n, --name <name>', 'Project name')
@@ -28,11 +28,11 @@ program
 const options = program.opts();
 
 async function main() {
-  console.log(chalk.cyan('\n🚀 Welcome to Open Lovable Setup!\n'));
+  console.log(chalk.cyan('\n🚀 Welcome to Novable Setup!\n'));
 
   let config = {
     sandbox: options.sandbox || 'opensandbox',
-    name: options.name || 'my-open-lovable',
+    name: options.name || 'my-Novable',
     path: options.path || process.cwd(),
     skipInstall: options.skipInstall || false,
     dryRun: options.dryRun || false

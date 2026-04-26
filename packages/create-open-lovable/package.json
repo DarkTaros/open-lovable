@@ -1,11 +1,11 @@
 {
-  "name": "create-open-lovable",
+  "name": "create-Novable",
   "version": "1.0.0",
-  "description": "CLI to bootstrap Open Lovable with OpenSandbox",
+  "description": "CLI to bootstrap Novable with OpenSandbox",
   "type": "module",
   "main": "index.js",
   "bin": {
-    "create-open-lovable": "./index.js"
+    "create-Novable": "./index.js"
   },
   "scripts": {
     "test": "node index.js --dry-run"

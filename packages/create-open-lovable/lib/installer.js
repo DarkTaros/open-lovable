@@ -81,13 +81,13 @@ export async function installer(config) {
 
 async function copyTemplate(src, dest) {
   const files = await fs.readdir(src);
-  
+
   for (const file of files) {
     const srcPath = path.join(src, file);
     const destPath = path.join(dest, file);
-    
+
     const stat = await fs.stat(srcPath);
-    
+
     if (stat.isDirectory()) {
       await fs.ensureDir(destPath);
       await copyTemplate(srcPath, destPath);
@@ -119,7 +119,7 @@ async function copyMainProject(mainProjectPath, projectPath, sandbox) {
   for (const item of itemsToCopy) {
     const srcPath = path.join(mainProjectPath, '..', item);
     const destPath = path.join(projectPath, item);
-    
+
     if (await fs.pathExists(srcPath)) {
       await fs.copy(srcPath, destPath, {
         overwrite: true,
@@ -136,18 +136,18 @@ async function copyMainProject(mainProjectPath, projectPath, sandbox) {
 }
 
 async function createEnvFile(projectPath, sandbox, answers) {
-  let envContent = '# Open Lovable Configuration\n\n';
-  
+  let envContent = '# Novable Configuration\n\n';
+
   // Sandbox provider
   envContent += `# Sandbox Provider\n`;
   envContent += `SANDBOX_PROVIDER=opensandbox\n`;
   envContent += `OPENSANDBOX_API_KEY=${answers.openSandboxApiKey || 'your_opensandbox_api_key_here'}\n`;
   envContent += `OPENSANDBOX_DOMAIN=${answers.openSandboxDomain || 'api.opensandbox.io'}\n\n`;
-  
+
   // Required keys
   envContent += `# REQUIRED - Web scraping for cloning websites\n`;
   envContent += `FIRECRAWL_API_KEY=${answers.firecrawlApiKey || 'your_firecrawl_api_key_here'}\n\n`;
-  
+
   // Required OpenAI-compatible runtime keys
   envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
   envContent += `OPENAI_API_KEY=${answers.openaiApiKey || 'your_openai_compatible_api_key_here'}\n`;
@@ -157,7 +157,7 @@ async function createEnvFile(projectPath, sandbox, answers) {
   envContent += `# ANTHROPIC_API_KEY=\n`;
   envContent += `# GEMINI_API_KEY=\n`;
   envContent += `# GROQ_API_KEY=\n`;
-  
+
   await fs.writeFile(path.join(projectPath, '.env'), envContent);
   const envExampleContent = envContent
     .replace(/FIRECRAWL_API_KEY=.*/g, 'FIRECRAWL_API_KEY=your_firecrawl_api_key_here')
@@ -169,17 +169,17 @@ async function createEnvFile(projectPath, sandbox, answers) {
 }
 
 async function createEnvExample(projectPath, sandbox) {
-  let envContent = '# Open Lovable Configuration\n\n';
-  
+  let envContent = '# Novable Configuration\n\n';
+
   envContent += `# Sandbox Provider\n`;
   envContent += `SANDBOX_PROVIDER=opensandbox\n`;
   envContent += `OPENSANDBOX_API_KEY=your_opensandbox_api_key_here\n`;
   envContent += `OPENSANDBOX_DOMAIN=api.opensandbox.io\n\n`;
-  
+
   envContent += `# REQUIRED - Web scraping for cloning websites\n`;
   envContent += `# Get yours at https://firecrawl.dev\n`;
   envContent += `FIRECRAWL_API_KEY=your_firecrawl_api_key_here\n\n`;
-  
+
   envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
   envContent += `OPENAI_API_KEY=your_openai_compatible_api_key_here\n`;
   envContent += `OPENAI_BASE_URL=https://a.ah-api.com/v1\n\n`;
@@ -188,13 +188,13 @@ async function createEnvExample(projectPath, sandbox) {
   envContent += `# ANTHROPIC_API_KEY=\n`;
   envContent += `# GEMINI_API_KEY=\n`;
   envContent += `# GROQ_API_KEY=\n`;
-  
+
   await fs.writeFile(path.join(projectPath, '.env.example'), envContent);
 }
 
 async function updatePackageJson(projectPath, name) {
   const packageJsonPath = path.join(projectPath, 'package.json');
-  
+
   if (await fs.pathExists(packageJsonPath)) {
     const packageJson = await fs.readJson(packageJsonPath);
     packageJson.name = name;
@@ -204,22 +204,22 @@ async function updatePackageJson(projectPath, name) {
 
 async function updateAppConfig(projectPath, sandbox) {
   const configPath = path.join(projectPath, 'config', 'app.config.ts');
-  
+
   if (await fs.pathExists(configPath)) {
     let content = await fs.readFile(configPath, 'utf-8');
-    
+
     // Add sandbox provider configuration
     const sandboxConfig = `
   // Sandbox Provider Configuration
   sandboxProvider: process.env.SANDBOX_PROVIDER || 'opensandbox',
 `;
-    
+
     // Insert after the opening of appConfig
     content = content.replace(
       'export const appConfig = {',
       `export const appConfig = {${sandboxConfig}`
     );
-    
+
     await fs.writeFile(configPath, content);
   }
 }
