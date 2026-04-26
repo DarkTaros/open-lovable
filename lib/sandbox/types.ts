@@ -7,7 +7,7 @@ export interface SandboxFile {
 export interface SandboxInfo {
   sandboxId: string;
   url: string;
-  provider: 'e2b' | 'vercel';
+  provider: 'opensandbox';
   createdAt: Date;
 }
 
@@ -19,16 +19,18 @@ export interface CommandResult {
 }
 
 export interface SandboxProviderConfig {
-  e2b?: {
-    apiKey: string;
-    timeoutMs?: number;
-    template?: string;
-  };
-  vercel?: {
-    teamId?: string;
-    projectId?: string;
-    token?: string;
-    authMethod?: 'oidc' | 'pat';
+  openSandbox?: {
+    apiKey?: string;
+    domain?: string;
+    image?: string;
+    timeoutSeconds?: number;
+    commandTimeoutSeconds?: number;
+    requestTimeoutSeconds?: number;
+    workingDirectory?: string;
+    vitePort?: number;
+    viteStartupDelay?: number;
+    resource?: Record<string, string>;
+    env?: Record<string, string>;
   };
 }
 

@@ -3,6 +3,7 @@ import { parseMorphEdits, applyMorphEditToFile } from '@/lib/morph-fast-apply';
 import { appConfig } from '@/config/app.config';
 import type { SandboxState } from '@/types/sandbox';
 import type { ConversationState } from '@/types/conversation';
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 declare global {
   var conversationState: ConversationState | null;
@@ -15,6 +16,37 @@ interface ParsedResponse {
   packages: string[];
   commands: string[];
   structure: string | null;
+}
+
+const CONFIG_FILES = [
+  'tailwind.config.js',
+  'vite.config.js',
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'postcss.config.js',
+];
+
+function normalizeSandboxFilePath(path: string): string {
+  let normalizedPath = path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^\.\//, '');
+  const fileName = normalizedPath.split('/').pop() || '';
+
+  if (
+    !normalizedPath.startsWith('src/') &&
+    !normalizedPath.startsWith('public/') &&
+    normalizedPath !== 'index.html' &&
+    !CONFIG_FILES.includes(fileName)
+  ) {
+    normalizedPath = `src/${normalizedPath}`;
+  }
+
+  return normalizedPath.replace(/\/\.\//g, '/');
+}
+
+function removeNonEntryCssImports(content: string): string {
+  return content.replace(/import\s+['"]([^'"]+\.css)['"];?\s*\n?/g, (statement, importPath) => {
+    return /(^|\/)index\.css$/i.test(importPath) ? statement : '';
+  });
 }
 
 function parseAIResponse(response: string): ParsedResponse {
@@ -129,8 +161,6 @@ function parseAIResponse(response: string): ParsedResponse {
 }
 
 declare global {
-  var activeSandbox: any;
-  var activeSandboxProvider: any;
   var existingFiles: Set<string>;
   var sandboxState: SandboxState;
 }
@@ -159,8 +189,7 @@ export async function POST(request: NextRequest) {
       global.existingFiles = new Set<string>();
     }
     
-    // Get the active sandbox or provider
-    const sandbox = global.activeSandbox || global.activeSandboxProvider;
+    const sandbox = getActiveSandboxProvider();
     
     // If no active sandbox, just return parsed results
     if (!sandbox) {
@@ -179,29 +208,7 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Verify sandbox is ready before applying code
     console.log('[apply-ai-code] Verifying sandbox is ready...');
-    
-    // For Vercel sandboxes, check if Vite is running
-    if (sandbox.constructor?.name === 'VercelProvider' || sandbox.getSandboxInfo?.()?.provider === 'vercel') {
-      console.log('[apply-ai-code] Detected Vercel sandbox, checking Vite status...');
-      try {
-        // Check if Vite process is running
-        const checkResult = await sandbox.runCommand('pgrep -f vite');
-        if (!checkResult || !checkResult.stdout) {
-          console.log('[apply-ai-code] Vite not running, starting it...');
-          // Start Vite if not running
-          await sandbox.runCommand('sh -c "cd /vercel/sandbox && nohup npm run dev > /tmp/vite.log 2>&1 &"');
-          // Wait for Vite to start
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          console.log('[apply-ai-code] Vite started, proceeding with code application');
-        } else {
-          console.log('[apply-ai-code] Vite is already running');
-        }
-      } catch (e) {
-        console.log('[apply-ai-code] Could not check Vite status, proceeding anyway:', e);
-      }
-    }
     
     // Apply to active sandbox
     console.log('[apply-ai-code] Applying code to sandbox...');
@@ -261,10 +268,9 @@ export async function POST(request: NextRequest) {
       console.log('[apply-ai-code] Number of files to scan:', parsed.files.length);
       
       // Filter out config files first
-      const configFiles = ['tailwind.config.js', 'vite.config.js', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.js'];
       const filteredFilesForDetection = parsed.files.filter(file => {
         const fileName = file.path.split('/').pop() || '';
-        return !configFiles.includes(fileName);
+        return !CONFIG_FILES.includes(fileName);
       });
       
       // Build files object for package detection
@@ -344,14 +350,14 @@ export async function POST(request: NextRequest) {
     const morphUpdatedPaths = new Set<string>();
 
     if (morphEnabled && morphEdits.length > 0) {
-      if (!global.activeSandbox) {
+      if (!sandbox) {
         console.warn('[apply-ai-code] Morph edits found but no active sandbox; skipping Morph application');
       } else {
         console.log(`[apply-ai-code] Applying ${morphEdits.length} fast edits via Morph...`);
         for (const edit of morphEdits) {
           try {
             const result = await applyMorphEditToFile({
-              sandbox: global.activeSandbox,
+              sandbox,
               targetPath: edit.targetFile,
               instructions: edit.instructions,
               updateSnippet: edit.update
@@ -378,10 +384,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter out config files that shouldn't be created
-    const configFiles = ['tailwind.config.js', 'vite.config.js', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.js'];
     let filteredFiles = parsed.files.filter(file => {
       const fileName = file.path.split('/').pop() || '';
-      if (configFiles.includes(fileName)) {
+      if (CONFIG_FILES.includes(fileName)) {
         console.warn(`[apply-ai-code] Skipping config file: ${file.path} - already exists in template`);
         return false;
       }
@@ -391,14 +396,7 @@ export async function POST(request: NextRequest) {
     // Avoid overwriting files already updated by Morph
     if (morphUpdatedPaths.size > 0) {
       filteredFiles = filteredFiles.filter(file => {
-        let normalizedPath = file.path.startsWith('/') ? file.path.slice(1) : file.path;
-        const fileName = normalizedPath.split('/').pop() || '';
-        if (!normalizedPath.startsWith('src/') &&
-            !normalizedPath.startsWith('public/') &&
-            normalizedPath !== 'index.html' &&
-            !configFiles.includes(fileName)) {
-          normalizedPath = 'src/' + normalizedPath;
-        }
+        const normalizedPath = normalizeSandboxFilePath(file.path);
         return !morphUpdatedPaths.has(normalizedPath);
       });
     }
@@ -406,22 +404,7 @@ export async function POST(request: NextRequest) {
     // Create or update files AFTER package installation
     for (const file of filteredFiles) {
       try {
-        // Normalize the file path
-        let normalizedPath = file.path;
-        // Remove leading slash if present
-        if (normalizedPath.startsWith('/')) {
-          normalizedPath = normalizedPath.substring(1);
-        }
-        // Ensure src/ prefix for component files
-        if (!normalizedPath.startsWith('src/') && 
-            !normalizedPath.startsWith('public/') && 
-            normalizedPath !== 'index.html' && 
-            normalizedPath !== 'package.json' &&
-            normalizedPath !== 'vite.config.js' &&
-            normalizedPath !== 'tailwind.config.js' &&
-            normalizedPath !== 'postcss.config.js') {
-          normalizedPath = 'src/' + normalizedPath;
-        }
+        const normalizedPath = normalizeSandboxFilePath(file.path);
         
         const fullPath = `/home/user/app/${normalizedPath}`;
         const isUpdate = global.existingFiles.has(normalizedPath);
@@ -429,7 +412,7 @@ export async function POST(request: NextRequest) {
         // Remove any CSS imports from JSX/JS files (we're using Tailwind)
         let fileContent = file.content;
         if (file.path.endsWith('.jsx') || file.path.endsWith('.js') || file.path.endsWith('.tsx') || file.path.endsWith('.ts')) {
-          fileContent = fileContent.replace(/import\s+['"]\.\/[^'"]+\.css['"];?\s*\n?/g, '');
+          fileContent = removeNonEntryCssImports(fileContent);
         }
         
         // Fix common Tailwind CSS errors in CSS files
@@ -441,19 +424,10 @@ export async function POST(request: NextRequest) {
           fileContent = fileContent.replace(/shadow-5xl/g, 'shadow-2xl');
         }
         
-        console.log(`[apply-ai-code] Writing file using E2B files API: ${fullPath}`);
+        console.log(`[apply-ai-code] Writing file to sandbox: ${fullPath}`);
         
         try {
-          // Check if we're using provider pattern (v2) or direct sandbox (v1)
-          if (sandbox.writeFile) {
-            // V2: Provider pattern (Vercel/E2B provider)
-            await sandbox.writeFile(file.path, fileContent);
-          } else if (sandbox.files?.write) {
-            // V1: Direct E2B sandbox
-            await sandbox.files.write(fullPath, fileContent);
-          } else {
-            throw new Error('Unsupported sandbox type');
-          }
+          await sandbox.writeFile(normalizedPath, fileContent);
           console.log(`[apply-ai-code] Successfully wrote file: ${fullPath}`);
           
           // Update file cache
@@ -466,7 +440,7 @@ export async function POST(request: NextRequest) {
           }
           
         } catch (writeError) {
-          console.error(`[apply-ai-code] E2B file write error:`, writeError);
+          console.error(`[apply-ai-code] Sandbox file write error:`, writeError);
           throw writeError as Error;
         }
         
@@ -484,7 +458,7 @@ export async function POST(request: NextRequest) {
     
     // Only create App.jsx if it's not an edit and doesn't exist
     const appFileInParsed = parsed.files.some(f => {
-      const normalized = f.path.replace(/^\//, '').replace(/^src\//, '');
+      const normalized = normalizeSandboxFilePath(f.path).replace(/^src\//, '');
       return normalized === 'App.jsx' || normalized === 'App.tsx';
     });
     
@@ -497,7 +471,7 @@ export async function POST(request: NextRequest) {
       // Find all component files
       const componentFiles = parsed.files.filter(f => 
         (f.path.endsWith('.jsx') || f.path.endsWith('.tsx')) &&
-        f.path.includes('component')
+        normalizeSandboxFilePath(f.path).includes('components/')
       );
       
       // Generate imports for components
@@ -508,9 +482,10 @@ export async function POST(request: NextRequest) {
           const fileName = pathParts[pathParts.length - 1];
           const componentName = fileName.replace(/\.(jsx|tsx)$/, '');
           // Fix import path - components are in src/components/
-          const importPath = f.path.startsWith('src/') 
-            ? f.path.replace('src/', './').replace(/\.(jsx|tsx)$/, '')
-            : './' + f.path.replace(/\.(jsx|tsx)$/, '');
+          const normalizedPath = normalizeSandboxFilePath(f.path);
+          const importPath = normalizedPath.startsWith('src/')
+            ? normalizedPath.replace('src/', './').replace(/\.(jsx|tsx)$/, '')
+            : './' + normalizedPath.replace(/\.(jsx|tsx)$/, '');
           return `import ${componentName} from '${importPath}';`;
         })
         .join('\n');
@@ -545,15 +520,7 @@ function App() {
 export default App;`;
       
       try {
-        // Use provider pattern if available
-        if (sandbox.writeFile) {
-          await sandbox.writeFile('src/App.jsx', appContent);
-        } else if (sandbox.writeFiles) {
-          await sandbox.writeFiles([{
-            path: 'src/App.jsx',
-            content: Buffer.from(appContent)
-          }]);
-        }
+        await sandbox.writeFile('src/App.jsx', appContent);
         
         console.log('Auto-generated: src/App.jsx');
         results.filesCreated.push('src/App.jsx (auto-generated)');
@@ -565,8 +532,8 @@ export default App;`;
       
       // Only create index.css if it doesn't exist
       const indexCssInParsed = parsed.files.some(f => {
-        const normalized = f.path.replace(/^\//, '').replace(/^src\//, '');
-        return normalized === 'index.css' || f.path === 'src/index.css';
+        const normalized = normalizeSandboxFilePath(f.path).replace(/^src\//, '');
+        return normalized === 'index.css';
       });
       
       const indexCssExists = global.existingFiles.has('src/index.css') || 
@@ -598,15 +565,7 @@ body {
   min-height: 100vh;
 }`;
 
-          // Use provider pattern if available
-          if (sandbox.writeFile) {
-            await sandbox.writeFile('src/index.css', indexCssContent);
-          } else if (sandbox.writeFiles) {
-            await sandbox.writeFiles([{
-              path: 'src/index.css',
-              content: Buffer.from(indexCssContent)
-            }]);
-          }
+          await sandbox.writeFile('src/index.css', indexCssContent);
           
           console.log('Auto-generated: src/index.css');
           results.filesCreated.push('src/index.css (with Tailwind)');
@@ -620,43 +579,12 @@ body {
     // Execute commands
     for (const cmd of parsed.commands) {
       try {
-        // Parse command and arguments
-        const commandParts = cmd.trim().split(/\s+/);
-        const cmdName = commandParts[0];
-        const args = commandParts.slice(1);
-        
-        // Execute command using sandbox
-        let result;
-        if (sandbox.runCommand && typeof sandbox.runCommand === 'function') {
-          // Check if this is a provider pattern sandbox
-          const testResult = await sandbox.runCommand(cmd);
-          if (testResult && typeof testResult === 'object' && 'stdout' in testResult) {
-            // Provider returns CommandResult directly
-            result = testResult;
-          } else {
-            // Direct sandbox - expects object with cmd and args
-            result = await sandbox.runCommand({
-              cmd: cmdName,
-              args
-            });
-          }
-        }
+        const result = await sandbox.runCommand(cmd);
         
         console.log(`Executed: ${cmd}`);
         
-        // Handle result based on type
-        let stdout = '';
-        let stderr = '';
-        
-        if (result) {
-          if (typeof result.stdout === 'string') {
-            stdout = result.stdout;
-            stderr = result.stderr || '';
-          } else if (typeof result.stdout === 'function') {
-            stdout = await result.stdout();
-            stderr = await result.stderr();
-          }
-        }
+        const stdout = result.stdout || '';
+        const stderr = result.stderr || '';
         
         if (stdout) console.log(stdout);
         if (stderr) console.log(`Errors: ${stderr}`);
@@ -692,7 +620,7 @@ body {
         if (imp.endsWith('.css')) continue;
         
         // Convert import path to expected file paths
-        const basePath = imp.replace('./', 'src/');
+        const basePath = normalizeSandboxFilePath(imp.replace('./', ''));
         const possiblePaths = [
           basePath + '.jsx',
           basePath + '.js',
@@ -701,7 +629,7 @@ body {
         ];
         
         const fileExists = parsed.files.some(f => 
-          possiblePaths.some(path => f.path === path)
+          possiblePaths.some(path => normalizeSandboxFilePath(f.path) === path)
         );
         
         if (!fileExists) {

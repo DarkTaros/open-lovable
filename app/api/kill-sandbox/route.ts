@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getActiveSandboxProvider, setActiveSandboxProvider } from '@/lib/sandbox/provider-state';
+import { sandboxManager } from '@/lib/sandbox/sandbox-manager';
 
 declare global {
-  var activeSandboxProvider: any;
   var sandboxData: any;
   var existingFiles: Set<string>;
 }
@@ -12,16 +13,20 @@ export async function POST() {
 
     let sandboxKilled = false;
 
-    // Stop existing sandbox if any
-    if (global.activeSandboxProvider) {
+    const provider = getActiveSandboxProvider();
+
+    if (provider) {
       try {
-        await global.activeSandboxProvider.terminate();
+        await sandboxManager.terminateAll();
+        if (provider.isAlive()) {
+          await provider.terminate();
+        }
         sandboxKilled = true;
         console.log('[kill-sandbox] Sandbox stopped successfully');
       } catch (e) {
         console.error('[kill-sandbox] Failed to stop sandbox:', e);
       }
-      global.activeSandboxProvider = null;
+      setActiveSandboxProvider(null);
       global.sandboxData = null;
     }
     

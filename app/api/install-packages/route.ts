@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 declare global {
-  var activeSandbox: any;
-  var activeSandboxProvider: any;
   var sandboxData: any;
 }
 
@@ -37,8 +36,7 @@ export async function POST(request: NextRequest) {
       console.log(`[install-packages] Cleaned:`, validPackages);
     }
     
-    // Get active sandbox provider
-    const provider = global.activeSandboxProvider;
+    const provider = getActiveSandboxProvider();
     
     if (!provider) {
       return NextResponse.json({ 

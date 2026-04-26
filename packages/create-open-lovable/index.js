@@ -16,9 +16,9 @@ const program = new Command();
 
 program
   .name('create-open-lovable')
-  .description('Create a new Open Lovable project with your choice of sandbox provider')
+  .description('Create a new Open Lovable project with OpenSandbox')
   .version('1.0.0')
-  .option('-s, --sandbox <provider>', 'Sandbox provider (e2b or vercel)')
+  .option('-s, --sandbox <provider>', 'Sandbox provider (opensandbox)')
   .option('-n, --name <name>', 'Project name')
   .option('-p, --path <path>', 'Installation path (defaults to current directory)')
   .option('--skip-install', 'Skip npm install')
@@ -31,7 +31,7 @@ async function main() {
   console.log(chalk.cyan('\n🚀 Welcome to Open Lovable Setup!\n'));
 
   let config = {
-    sandbox: options.sandbox,
+    sandbox: options.sandbox || 'opensandbox',
     name: options.name || 'my-open-lovable',
     path: options.path || process.cwd(),
     skipInstall: options.skipInstall || false,
@@ -46,11 +46,13 @@ async function main() {
   }
 
   // Validate sandbox provider
-  if (!['e2b', 'vercel'].includes(config.sandbox)) {
+  if (!['opensandbox', 'open-sandbox'].includes(config.sandbox)) {
     console.error(chalk.red(`\n❌ Invalid sandbox provider: ${config.sandbox}`));
-    console.log(chalk.yellow('Valid options: e2b, vercel\n'));
+    console.log(chalk.yellow('Valid options: opensandbox\n'));
     process.exit(1);
   }
+
+  config.sandbox = 'opensandbox';
 
   console.log(chalk.gray('\nConfiguration:'));
   console.log(chalk.gray(`  Project: ${config.name}`));

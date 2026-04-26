@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
-import { sandboxManager } from '@/lib/sandbox/sandbox-manager';
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 declare global {
-  var activeSandboxProvider: any;
   var sandboxData: any;
   var existingFiles: Set<string>;
 }
 
 export async function GET() {
   try {
-    // Check sandbox manager first, then fall back to global state
-    const provider = sandboxManager.getActiveProvider() || global.activeSandboxProvider;
+    const provider = getActiveSandboxProvider();
     const sandboxExists = !!provider;
 
     let sandboxHealthy = false;

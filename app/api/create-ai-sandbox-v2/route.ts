@@ -1,19 +1,69 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { SandboxFactory } from '@/lib/sandbox/factory';
 // SandboxProvider type is used through SandboxFactory
 import type { SandboxState } from '@/types/sandbox';
 import { sandboxManager } from '@/lib/sandbox/sandbox-manager';
+import { setActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 // Store active sandbox globally
 declare global {
+  var activeSandbox: any;
   var activeSandboxProvider: any;
   var sandboxData: any;
   var existingFiles: Set<string>;
   var sandboxState: SandboxState;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const body = await request.json().catch(() => ({}));
+    const sandboxIdToRestore = typeof body?.sandboxId === 'string' ? body.sandboxId.trim() : '';
+
+    if (body?.restore && sandboxIdToRestore) {
+      console.log('[create-ai-sandbox-v2] Restoring sandbox:', sandboxIdToRestore);
+
+      const provider = await sandboxManager.getOrCreateProvider(sandboxIdToRestore);
+      const providerInfo = provider.getSandboxInfo();
+
+      if (!providerInfo) {
+        throw new Error(`Could not restore sandbox ${sandboxIdToRestore}`);
+      }
+
+      setActiveSandboxProvider(provider);
+      global.sandboxData = {
+        sandboxId: providerInfo.sandboxId,
+        url: providerInfo.url
+      };
+
+      if (!global.existingFiles) {
+        global.existingFiles = new Set<string>();
+      }
+
+      global.sandboxState = {
+        fileCache: {
+          files: {},
+          lastSync: Date.now(),
+          sandboxId: providerInfo.sandboxId
+        },
+        sandbox: provider,
+        sandboxData: {
+          sandboxId: providerInfo.sandboxId,
+          url: providerInfo.url
+        }
+      };
+
+      console.log('[create-ai-sandbox-v2] Sandbox restored at:', providerInfo.url);
+
+      return NextResponse.json({
+        success: true,
+        restored: true,
+        sandboxId: providerInfo.sandboxId,
+        url: providerInfo.url,
+        provider: providerInfo.provider,
+        message: 'Sandbox restored'
+      });
+    }
+
     console.log('[create-ai-sandbox-v2] Creating sandbox...');
     
     // Clean up all existing sandboxes
@@ -27,7 +77,7 @@ export async function POST() {
       } catch (e) {
         console.error('Failed to terminate legacy global sandbox:', e);
       }
-      global.activeSandboxProvider = null;
+      setActiveSandboxProvider(null);
     }
     
     // Clear existing files tracking
@@ -48,7 +98,7 @@ export async function POST() {
     sandboxManager.registerSandbox(sandboxInfo.sandboxId, provider);
     
     // Also store in legacy global state for backward compatibility
-    global.activeSandboxProvider = provider;
+    setActiveSandboxProvider(provider);
     global.sandboxData = {
       sandboxId: sandboxInfo.sandboxId,
       url: sandboxInfo.url
@@ -89,7 +139,7 @@ export async function POST() {
       } catch (e) {
         console.error('Failed to terminate sandbox on error:', e);
       }
-      global.activeSandboxProvider = null;
+      setActiveSandboxProvider(null);
     }
     
     return NextResponse.json(

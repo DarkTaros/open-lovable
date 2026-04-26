@@ -1,0 +1,14 @@
+[     193ms] [ERROR] [createSandbox] Error: TypeError: Failed to fetch
+    at createSandbox (http://localhost:3000/_next/static/chunks/_e7167437._.js:2364:36)
+    at AISandboxPage.useEffect.initializePage (http://localhost:3000/_next/static/chunks/_e7167437._.js:2058:35) @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_9eddecd1._.js:2248
+[     194ms] [ERROR] [ai-sandbox] Failed to create or restore sandbox: TypeError: Failed to fetch
+    at createSandbox (http://localhost:3000/_next/static/chunks/_e7167437._.js:2364:36)
+    at AISandboxPage.useEffect.initializePage (http://localhost:3000/_next/static/chunks/_e7167437._.js:2058:35) @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_9eddecd1._.js:2248
+[     312ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_compiled_react-dom_5e4713c5._.js:14475
+[     880ms] [LOG] [checkSandboxStatus] Setting sandboxData from API: {sandboxId: 696a5784-2370-4f64-9482-407b628bda6e, url: http://127.0.0.1:51679/proxy/5173, filesTracked: Array(0), lastHealthCheck: 2026-04-25T08:19:32.867Z} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2316
+[     893ms] [LOG] [home] Cleared old conversation data on mount @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2036
+[     893ms] [LOG] [home] No sandbox in URL, creating new sandbox automatically... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2055
+[     893ms] [LOG] [createSandbox] Starting sandbox creation... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2356
+[   39419ms] [LOG] [createSandbox] Response data: {success: true, sandboxId: 5b601607-2576-4928-b6d0-ae04e56fb1f7, url: http://127.0.0.1:59554/proxy/5173, provider: opensandbox, message: Sandbox created and Vite React app initialized} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2371
+[   39419ms] [LOG] [createSandbox] Setting sandboxData from creation: {success: true, sandboxId: 5b601607-2576-4928-b6d0-ae04e56fb1f7, url: http://127.0.0.1:59554/proxy/5173, provider: opensandbox, message: Sandbox created and Vite React app initialized} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2374
+[   39421ms] [LOG] [createSandbox] Sandbox ready with Vite server running @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2399

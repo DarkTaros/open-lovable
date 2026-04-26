@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Get active sandbox from global state (in production, use a proper state management solution)
-declare global {
-  var activeSandbox: any;
-}
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,8 +11,10 @@ export async function POST(request: NextRequest) {
         error: 'Command is required' 
       }, { status: 400 });
     }
+
+    const provider = getActiveSandboxProvider();
     
-    if (!global.activeSandbox) {
+    if (!provider) {
       return NextResponse.json({ 
         success: false, 
         error: 'No active sandbox' 
@@ -24,33 +22,19 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`[run-command] Executing: ${command}`);
-    
-    // Parse command and arguments
-    const commandParts = command.trim().split(/\s+/);
-    const cmd = commandParts[0];
-    const args = commandParts.slice(1);
-    
-    // Execute command using Vercel Sandbox
-    const result = await global.activeSandbox.runCommand({
-      cmd,
-      args
-    });
-    
-    // Get output streams
-    const stdout = await result.stdout();
-    const stderr = await result.stderr();
-    
+    const result = await provider.runCommand(command);
+
     const output = [
-      stdout ? `STDOUT:\n${stdout}` : '',
-      stderr ? `\nSTDERR:\n${stderr}` : '',
+      result.stdout ? `STDOUT:\n${result.stdout}` : '',
+      result.stderr ? `\nSTDERR:\n${result.stderr}` : '',
       `\nExit code: ${result.exitCode}`
     ].filter(Boolean).join('');
     
     return NextResponse.json({
-      success: true,
+      success: result.success,
       output,
       exitCode: result.exitCode,
-      message: result.exitCode === 0 ? 'Command executed successfully' : 'Command completed with non-zero exit code'
+      message: result.success ? 'Command executed successfully' : 'Command completed with non-zero exit code'
     });
     
   } catch (error) {

@@ -47,17 +47,7 @@ export async function POST(request: NextRequest) {
         waitFor: 3000,
         timeout: 30000,
         blockAds: true,
-        maxAge: 3600000, // Use cached data if less than 1 hour old (500% faster!)
-        actions: [
-          {
-            type: 'wait',
-            milliseconds: 2000
-          },
-          {
-            type: 'screenshot',
-            fullPage: false // Just visible viewport for performance
-          }
-        ]
+        maxAge: 3600000 // Use cached data if less than 1 hour old (500% faster!)
       })
     });
     
@@ -72,11 +62,10 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to scrape content');
     }
     
-    const { markdown, metadata, screenshot, actions } = data.data;
+    const { markdown, metadata, screenshot } = data.data;
     // html available but not used in current implementation
     
-    // Get screenshot from either direct field or actions result
-    const screenshotUrl = screenshot || actions?.screenshots?.[0] || null;
+    const screenshotUrl = screenshot || null;
     
     // Sanitize the markdown content
     const sanitizedMarkdown = sanitizeQuotes(markdown || '');

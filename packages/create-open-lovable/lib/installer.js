@@ -140,26 +140,13 @@ async function createEnvFile(projectPath, sandbox, answers) {
   
   // Sandbox provider
   envContent += `# Sandbox Provider\n`;
-  envContent += `SANDBOX_PROVIDER=${sandbox}\n\n`;
+  envContent += `SANDBOX_PROVIDER=opensandbox\n`;
+  envContent += `OPENSANDBOX_API_KEY=${answers.openSandboxApiKey || 'your_opensandbox_api_key_here'}\n`;
+  envContent += `OPENSANDBOX_DOMAIN=${answers.openSandboxDomain || 'api.opensandbox.io'}\n\n`;
   
   // Required keys
   envContent += `# REQUIRED - Web scraping for cloning websites\n`;
   envContent += `FIRECRAWL_API_KEY=${answers.firecrawlApiKey || 'your_firecrawl_api_key_here'}\n\n`;
-  
-  if (sandbox === 'e2b') {
-    envContent += `# REQUIRED - E2B Sandboxes\n`;
-    envContent += `E2B_API_KEY=${answers.e2bApiKey || 'your_e2b_api_key_here'}\n\n`;
-  } else if (sandbox === 'vercel') {
-    envContent += `# REQUIRED - Vercel Sandboxes\n`;
-    if (answers.vercelAuthMethod === 'oidc') {
-      envContent += `# Using OIDC authentication (automatic in Vercel environment)\n`;
-    } else {
-      envContent += `VERCEL_TEAM_ID=${answers.vercelTeamId || 'your_team_id'}\n`;
-      envContent += `VERCEL_PROJECT_ID=${answers.vercelProjectId || 'your_project_id'}\n`;
-      envContent += `VERCEL_TOKEN=${answers.vercelToken || 'your_access_token'}\n`;
-    }
-    envContent += '\n';
-  }
   
   // Required OpenAI-compatible runtime keys
   envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
@@ -174,10 +161,8 @@ async function createEnvFile(projectPath, sandbox, answers) {
   await fs.writeFile(path.join(projectPath, '.env'), envContent);
   const envExampleContent = envContent
     .replace(/FIRECRAWL_API_KEY=.*/g, 'FIRECRAWL_API_KEY=your_firecrawl_api_key_here')
-    .replace(/E2B_API_KEY=.*/g, 'E2B_API_KEY=your_e2b_api_key_here')
-    .replace(/VERCEL_TEAM_ID=.*/g, 'VERCEL_TEAM_ID=your_team_id')
-    .replace(/VERCEL_PROJECT_ID=.*/g, 'VERCEL_PROJECT_ID=your_project_id')
-    .replace(/VERCEL_TOKEN=.*/g, 'VERCEL_TOKEN=your_access_token')
+    .replace(/OPENSANDBOX_API_KEY=.*/g, 'OPENSANDBOX_API_KEY=your_opensandbox_api_key_here')
+    .replace(/OPENSANDBOX_DOMAIN=.*/g, 'OPENSANDBOX_DOMAIN=api.opensandbox.io')
     .replace(/OPENAI_API_KEY=.*/g, 'OPENAI_API_KEY=your_openai_compatible_api_key_here')
     .replace(/OPENAI_BASE_URL=.*/g, 'OPENAI_BASE_URL=https://a.ah-api.com/v1');
   await fs.writeFile(path.join(projectPath, '.env.example'), envExampleContent);
@@ -187,24 +172,13 @@ async function createEnvExample(projectPath, sandbox) {
   let envContent = '# Open Lovable Configuration\n\n';
   
   envContent += `# Sandbox Provider\n`;
-  envContent += `SANDBOX_PROVIDER=${sandbox}\n\n`;
+  envContent += `SANDBOX_PROVIDER=opensandbox\n`;
+  envContent += `OPENSANDBOX_API_KEY=your_opensandbox_api_key_here\n`;
+  envContent += `OPENSANDBOX_DOMAIN=api.opensandbox.io\n\n`;
   
   envContent += `# REQUIRED - Web scraping for cloning websites\n`;
   envContent += `# Get yours at https://firecrawl.dev\n`;
   envContent += `FIRECRAWL_API_KEY=your_firecrawl_api_key_here\n\n`;
-  
-  if (sandbox === 'e2b') {
-    envContent += `# REQUIRED - Sandboxes for code execution\n`;
-    envContent += `# Get yours at https://e2b.dev\n`;
-    envContent += `E2B_API_KEY=your_e2b_api_key_here\n\n`;
-  } else if (sandbox === 'vercel') {
-    envContent += `# REQUIRED - Vercel Sandboxes\n`;
-    envContent += `# Option 1: OIDC (automatic in Vercel environment)\n`;
-    envContent += `# Option 2: Personal Access Token\n`;
-    envContent += `VERCEL_TEAM_ID=your_team_id\n`;
-    envContent += `VERCEL_PROJECT_ID=your_project_id\n`;
-    envContent += `VERCEL_TOKEN=your_access_token\n\n`;
-  }
   
   envContent += `# REQUIRED - OpenAI-compatible AI runtime\n`;
   envContent += `OPENAI_API_KEY=your_openai_compatible_api_key_here\n`;
@@ -237,7 +211,7 @@ async function updateAppConfig(projectPath, sandbox) {
     // Add sandbox provider configuration
     const sandboxConfig = `
   // Sandbox Provider Configuration
-  sandboxProvider: process.env.SANDBOX_PROVIDER || '${sandbox}',
+  sandboxProvider: process.env.SANDBOX_PROVIDER || 'opensandbox',
 `;
     
     // Insert after the opening of appConfig

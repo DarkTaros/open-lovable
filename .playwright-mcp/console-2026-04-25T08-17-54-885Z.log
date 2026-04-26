@@ -1,0 +1,13 @@
+[     265ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_compiled_react-dom_5e4713c5._.js:14475
+[     660ms] [LOG] [home] Cleared old conversation data on mount @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2036
+[     660ms] [LOG] [home] No sandbox in URL, creating new sandbox automatically... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2055
+[     660ms] [LOG] [createSandbox] Starting sandbox creation... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2356
+[     753ms] [LOG] [checkSandboxStatus] Setting sandboxData from API: {sandboxId: d92a1ccd-c1e5-4ca1-b087-15ff52b0b0b8, url: http://127.0.0.1:42859/proxy/5173, filesTracked: Array(0), lastHealthCheck: 2026-04-25T08:17:55.637Z} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2316
+[     760ms] [LOG] [Fast Refresh] done in NaNms @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5557
+[     887ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:42859/@vite/client:0
+[     888ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:42859/src/main.jsx:0
+[   37745ms] [LOG] [createSandbox] Response data: {success: true, sandboxId: 3c01d346-bc98-4f59-ba79-8dfe1091b515, url: http://127.0.0.1:45295/proxy/5173, provider: opensandbox, message: Sandbox created and Vite React app initialized} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2371
+[   37745ms] [LOG] [createSandbox] Setting sandboxData from creation: {success: true, sandboxId: 3c01d346-bc98-4f59-ba79-8dfe1091b515, url: http://127.0.0.1:45295/proxy/5173, provider: opensandbox, message: Sandbox created and Vite React app initialized} @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2374
+[   37747ms] [LOG] [createSandbox] Sandbox ready with Vite server running @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2399
+[   42596ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5693
+[   42714ms] [LOG] [Fast Refresh] done in 217ms @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5557

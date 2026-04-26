@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-declare global {
-  var activeSandbox: any;
-}
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +12,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (!global.activeSandbox) {
+    const provider = getActiveSandboxProvider();
+
+    if (!provider) {
       return NextResponse.json({
         success: false,
         error: 'No active sandbox'
@@ -98,10 +97,7 @@ export async function POST(request: NextRequest) {
     
     for (const packageName of uniquePackages) {
       try {
-        const checkResult = await global.activeSandbox.runCommand({
-          cmd: 'test',
-          args: ['-d', `node_modules/${packageName}`]
-        });
+        const checkResult = await provider.runCommand(`test -d "node_modules/${packageName.replace(/"/g, '\\"')}"`);
         
         if (checkResult.exitCode === 0) {
           installed.push(packageName);
@@ -129,13 +125,10 @@ export async function POST(request: NextRequest) {
     // Install missing packages
     console.log('[detect-and-install-packages] Installing packages:', missing);
     
-    const installResult = await global.activeSandbox.runCommand({
-      cmd: 'npm',
-      args: ['install', '--save', ...missing]
-    });
+    const installResult = await provider.installPackages(missing);
 
-    const stdout = await installResult.stdout();
-    const stderr = await installResult.stderr();
+    const stdout = installResult.stdout;
+    const stderr = installResult.stderr;
     
     console.log('[detect-and-install-packages] Install stdout:', stdout);
     if (stderr) {
@@ -148,10 +141,7 @@ export async function POST(request: NextRequest) {
 
     for (const packageName of missing) {
       try {
-        const verifyResult = await global.activeSandbox.runCommand({
-          cmd: 'test',
-          args: ['-d', `node_modules/${packageName}`]
-        });
+        const verifyResult = await provider.runCommand(`test -d "node_modules/${packageName.replace(/"/g, '\\"')}"`);
         
         if (verifyResult.exitCode === 0) {
           finalInstalled.push(packageName);

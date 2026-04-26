@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-
-declare global {
-  var activeSandbox: any;
-}
+import { getActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 export async function GET() {
   try {
-    if (!global.activeSandbox) {
+    const provider = getActiveSandboxProvider();
+
+    if (!provider) {
       return NextResponse.json({ 
         success: false, 
         error: 'No active sandbox' 
@@ -15,18 +14,12 @@ export async function GET() {
     
     console.log('[sandbox-logs] Fetching Vite dev server logs...');
     
-    // Check if Vite processes are running
-    const psResult = await global.activeSandbox.runCommand({
-      cmd: 'ps',
-      args: ['aux']
-    });
-    
+    const psResult = await provider.runCommand('ps aux');
     let viteRunning = false;
     const logContent: string[] = [];
     
-    if (psResult.exitCode === 0) {
-      const psOutput = await psResult.stdout();
-      const viteProcesses = psOutput.split('\n').filter((line: string) => 
+    if (psResult.success) {
+      const viteProcesses = psResult.stdout.split('\n').filter((line: string) => 
         line.toLowerCase().includes('vite') || 
         line.toLowerCase().includes('npm run dev')
       );
@@ -34,42 +27,30 @@ export async function GET() {
       viteRunning = viteProcesses.length > 0;
       
       if (viteRunning) {
-        logContent.push("Vite is running");
-        logContent.push(...viteProcesses.slice(0, 3)); // Show first 3 processes
+        logContent.push('Vite is running');
+        logContent.push(...viteProcesses.slice(0, 3));
       } else {
-        logContent.push("Vite process not found");
+        logContent.push('Vite process not found');
       }
     }
     
-    // Try to read any recent log files
     try {
-      const findResult = await global.activeSandbox.runCommand({
-        cmd: 'find',
-        args: ['/tmp', '-name', '*vite*', '-name', '*.log', '-type', 'f']
-      });
+      const findResult = await provider.runCommand(`find /tmp -name '*vite*' -name '*.log' -type f`);
       
-      if (findResult.exitCode === 0) {
-        const logFiles = (await findResult.stdout()).split('\n').filter((f: string) => f.trim());
+      if (findResult.success) {
+        const logFiles = findResult.stdout.split('\n').filter((f: string) => f.trim());
         
         for (const logFile of logFiles.slice(0, 2)) {
-          try {
-            const catResult = await global.activeSandbox.runCommand({
-              cmd: 'tail',
-              args: ['-n', '10', logFile]
-            });
-            
-            if (catResult.exitCode === 0) {
-              const logFileContent = await catResult.stdout();
-              logContent.push(`--- ${logFile} ---`);
-              logContent.push(logFileContent);
-            }
-          } catch {
-            // Skip if can't read log file
+          const catResult = await provider.runCommand(`tail -n 10 "${logFile.replace(/"/g, '\\"')}"`);
+          
+          if (catResult.success) {
+            logContent.push(`--- ${logFile} ---`);
+            logContent.push(catResult.stdout);
           }
         }
       }
     } catch {
-      // No log files found, that's OK
+      // No log files found, that's OK.
     }
     
     return NextResponse.json({

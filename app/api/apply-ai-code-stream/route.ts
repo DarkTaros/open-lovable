@@ -4,10 +4,10 @@ import { parseMorphEdits, applyMorphEditToFile } from '@/lib/morph-fast-apply';
 import type { SandboxState } from '@/types/sandbox';
 import type { ConversationState } from '@/types/conversation';
 import { sandboxManager } from '@/lib/sandbox/sandbox-manager';
+import { getActiveSandboxProvider, setActiveSandboxProvider } from '@/lib/sandbox/provider-state';
 
 declare global {
   var conversationState: ConversationState | null;
-  var activeSandboxProvider: any;
   var existingFiles: Set<string>;
   var sandboxState: SandboxState;
 }
@@ -19,6 +19,37 @@ interface ParsedResponse {
   packages: string[];
   commands: string[];
   structure: string | null;
+}
+
+const CONFIG_FILES = [
+  'tailwind.config.js',
+  'vite.config.js',
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'postcss.config.js',
+];
+
+function normalizeSandboxFilePath(path: string): string {
+  let normalizedPath = path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^\.\//, '');
+  const fileName = normalizedPath.split('/').pop() || '';
+
+  if (
+    !normalizedPath.startsWith('src/') &&
+    !normalizedPath.startsWith('public/') &&
+    normalizedPath !== 'index.html' &&
+    !CONFIG_FILES.includes(fileName)
+  ) {
+    normalizedPath = `src/${normalizedPath}`;
+  }
+
+  return normalizedPath.replace(/\/\.\//g, '/');
+}
+
+function removeNonEntryCssImports(content: string): string {
+  return content.replace(/import\s+['"]([^'"]+\.css)['"];?\s*\n?/g, (statement, importPath) => {
+    return /(^|\/)index\.css$/i.test(importPath) ? statement : '';
+  });
 }
 
 function parseAIResponse(response: string): ParsedResponse {
@@ -307,7 +338,7 @@ export async function POST(request: NextRequest) {
 
     // Fall back to global state if not found in manager
     if (!provider) {
-      provider = global.activeSandboxProvider;
+      provider = getActiveSandboxProvider();
     }
 
     // If we have a sandboxId but no provider, try to get or create one
@@ -320,13 +351,17 @@ export async function POST(request: NextRequest) {
         // If we got a new provider (not reconnected), we need to create a new sandbox
         if (!provider.getSandboxInfo()) {
           console.log(`[apply-ai-code-stream] Creating new sandbox since reconnection failed for ${sandboxId}`);
-          await provider.createSandbox();
+          const sandboxInfo = await provider.createSandbox();
           await provider.setupViteApp();
-          sandboxManager.registerSandbox(sandboxId, provider);
+          sandboxManager.registerSandbox(sandboxInfo.sandboxId, provider);
+          global.sandboxData = {
+            sandboxId: sandboxInfo.sandboxId,
+            url: sandboxInfo.url
+          };
         }
 
         // Update legacy global state
-        global.activeSandboxProvider = provider;
+        setActiveSandboxProvider(provider);
         console.log(`[apply-ai-code-stream] Successfully got provider for sandbox ${sandboxId}`);
       } catch (providerError) {
         console.error(`[apply-ai-code-stream] Failed to get or create provider for sandbox ${sandboxId}:`, providerError);
@@ -360,7 +395,7 @@ export async function POST(request: NextRequest) {
         sandboxManager.registerSandbox(sandboxInfo.sandboxId, provider);
 
         // Store in legacy global state
-        global.activeSandboxProvider = provider;
+        setActiveSandboxProvider(provider);
         global.sandboxData = {
           sandboxId: sandboxInfo.sandboxId,
           url: sandboxInfo.url
@@ -526,17 +561,16 @@ export async function POST(request: NextRequest) {
         });
 
         // Filter out config files that shouldn't be created
-        const configFiles = ['tailwind.config.js', 'vite.config.js', 'package.json', 'package-lock.json', 'tsconfig.json', 'postcss.config.js'];
         let filteredFiles = filesArray.filter(file => {
           if (!file || typeof file !== 'object') return false;
           const fileName = (file.path || '').split('/').pop() || '';
-          return !configFiles.includes(fileName);
+          return !CONFIG_FILES.includes(fileName);
         });
 
         // If Morph is enabled and we have edits, apply them before file writes
         const morphUpdatedPaths = new Set<string>();
         if (morphEnabled && morphEdits.length > 0) {
-          const morphSandbox = (global as any).activeSandbox || providerInstance;
+          const morphSandbox = providerInstance;
           if (!morphSandbox) {
             console.warn('[apply-ai-code-stream] No sandbox available to apply Morph edits');
             await sendProgress({ type: 'warning', message: 'No sandbox available to apply Morph edits' });
@@ -576,14 +610,7 @@ export async function POST(request: NextRequest) {
         if (morphUpdatedPaths.size > 0) {
           filteredFiles = filteredFiles.filter(file => {
             if (!file?.path) return true;
-            let normalizedPath = file.path.startsWith('/') ? file.path.slice(1) : file.path;
-            const fileName = normalizedPath.split('/').pop() || '';
-            if (!normalizedPath.startsWith('src/') &&
-                !normalizedPath.startsWith('public/') &&
-                normalizedPath !== 'index.html' &&
-                !configFiles.includes(fileName)) {
-              normalizedPath = 'src/' + normalizedPath;
-            }
+            const normalizedPath = normalizeSandboxFilePath(file.path);
             return !morphUpdatedPaths.has(normalizedPath);
           });
         }
@@ -599,24 +626,14 @@ export async function POST(request: NextRequest) {
               action: 'creating'
             });
 
-            // Normalize the file path
-            let normalizedPath = file.path;
-            if (normalizedPath.startsWith('/')) {
-              normalizedPath = normalizedPath.substring(1);
-            }
-            if (!normalizedPath.startsWith('src/') &&
-              !normalizedPath.startsWith('public/') &&
-              normalizedPath !== 'index.html' &&
-              !configFiles.includes(normalizedPath.split('/').pop() || '')) {
-              normalizedPath = 'src/' + normalizedPath;
-            }
+            const normalizedPath = normalizeSandboxFilePath(file.path);
 
             const isUpdate = global.existingFiles.has(normalizedPath);
 
             // Remove any CSS imports from JSX/JS files (we're using Tailwind)
             let fileContent = file.content;
             if (file.path.endsWith('.jsx') || file.path.endsWith('.js') || file.path.endsWith('.tsx') || file.path.endsWith('.ts')) {
-              fileContent = fileContent.replace(/import\s+['"]\.\/[^'"]+\.css['"];?\s*\n?/g, '');
+              fileContent = removeNonEntryCssImports(fileContent);
             }
 
             // Fix common Tailwind CSS errors in CSS files

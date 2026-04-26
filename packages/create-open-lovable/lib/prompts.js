@@ -26,17 +26,12 @@ export function getPrompts(config) {
       message: 'Choose your sandbox provider:',
       choices: [
         {
-          name: 'E2B - Full-featured development sandboxes',
-          value: 'e2b',
-          short: 'E2B'
-        },
-        {
-          name: 'Vercel - Lightweight ephemeral VMs',
-          value: 'vercel',
-          short: 'Vercel'
+          name: 'OpenSandbox - Open source development sandboxes',
+          value: 'opensandbox',
+          short: 'OpenSandbox'
         }
       ],
-      default: 'e2b'
+      default: 'opensandbox'
     });
   }
 
@@ -66,76 +61,30 @@ export function getEnvPrompts(provider) {
     }
   });
 
-  if (provider === 'e2b') {
-    prompts.push({
-      type: 'input',
-      name: 'e2bApiKey',
-      message: 'E2B API key:',
-      validate: (input) => {
-        if (!input || input.trim() === '') {
-          return 'E2B API key is required';
-        }
-        return true;
+  prompts.push({
+    type: 'input',
+    name: 'openSandboxApiKey',
+    message: 'OpenSandbox API key:',
+    validate: (input) => {
+      if (!input || input.trim() === '') {
+        return 'OpenSandbox API key is required';
       }
-    });
-  } else if (provider === 'vercel') {
-    prompts.push({
-      type: 'list',
-      name: 'vercelAuthMethod',
-      message: 'Vercel authentication method:',
-      choices: [
-        {
-          name: 'OIDC Token (automatic in Vercel environment)',
-          value: 'oidc',
-          short: 'OIDC'
-        },
-        {
-          name: 'Personal Access Token',
-          value: 'pat',
-          short: 'PAT'
-        }
-      ]
-    });
+      return true;
+    }
+  });
 
-    prompts.push({
-      type: 'input',
-      name: 'vercelTeamId',
-      message: 'Vercel Team ID:',
-      when: (answers) => answers.vercelAuthMethod === 'pat',
-      validate: (input) => {
-        if (!input || input.trim() === '') {
-          return 'Team ID is required for PAT authentication';
-        }
-        return true;
+  prompts.push({
+    type: 'input',
+    name: 'openSandboxDomain',
+    message: 'OpenSandbox domain:',
+    default: 'api.opensandbox.io',
+    validate: (input) => {
+      if (!input || input.trim() === '') {
+        return 'OpenSandbox domain is required';
       }
-    });
-
-    prompts.push({
-      type: 'input',
-      name: 'vercelProjectId',
-      message: 'Vercel Project ID:',
-      when: (answers) => answers.vercelAuthMethod === 'pat',
-      validate: (input) => {
-        if (!input || input.trim() === '') {
-          return 'Project ID is required for PAT authentication';
-        }
-        return true;
-      }
-    });
-
-    prompts.push({
-      type: 'input',
-      name: 'vercelToken',
-      message: 'Vercel Access Token:',
-      when: (answers) => answers.vercelAuthMethod === 'pat',
-      validate: (input) => {
-        if (!input || input.trim() === '') {
-          return 'Access token is required for PAT authentication';
-        }
-        return true;
-      }
-    });
-  }
+      return true;
+    }
+  });
 
   prompts.push({
     type: 'input',

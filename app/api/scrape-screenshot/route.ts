@@ -29,13 +29,7 @@ export async function POST(req: NextRequest) {
       formats: ['screenshot'], // Request screenshot format
       waitFor: 3000, // Wait for page to fully load
       timeout: 30000,
-      onlyMainContent: false, // Get full page for screenshot
-      actions: [
-        {
-          type: 'wait',
-          milliseconds: 2000 // Additional wait for dynamic content
-        }
-      ]
+      onlyMainContent: false // Get full page for screenshot
     });
 
     console.log('[scrape-screenshot] Full scrape result:', JSON.stringify(scrapeResult, null, 2));

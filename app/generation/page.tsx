@@ -60,6 +60,58 @@ interface ScrapeData {
   error?: string;
 }
 
+type GeneratedFileSnapshot = {
+  path: string;
+  content: string;
+  type: string;
+  completed: boolean;
+  edited?: boolean;
+};
+
+type SerializedChatMessage = Omit<ChatMessage, 'timestamp'> & {
+  timestamp: string | Date;
+};
+
+type SavedGenerationSession = {
+  version: 1;
+  chatMessages: SerializedChatMessage[];
+  conversationContext: {
+    scrapedWebsites: Array<{ url: string; content: any; timestamp: string }>;
+    generatedComponents: Array<{ name: string; path: string; content: string }>;
+    appliedCode: Array<{ files: string[]; timestamp: string }>;
+    currentProject: string;
+    lastGeneratedCode?: string;
+  };
+  promptInput: string;
+  generationFiles: GeneratedFileSnapshot[];
+  homeUrlInput: string;
+  homeContextInput: string;
+  hasInitialSubmission: boolean;
+  activeTab: 'generation' | 'preview';
+  savedAt: number;
+};
+
+const SESSION_STORAGE_PREFIX = 'open-lovable:generation-session:';
+
+const createWelcomeMessage = (): ChatMessage => ({
+  content: 'Welcome! I can help you generate code with full context of your sandbox files and structure. Just start chatting - I\'ll automatically create a sandbox for you if needed!\n\nTip: If you see package errors like "react-router-dom not found", just type "npm install" or "check packages" to automatically install missing packages.',
+  type: 'system',
+  timestamp: new Date()
+});
+
+const getSessionStorageKey = (sandboxId: string) => `${SESSION_STORAGE_PREFIX}${sandboxId}`;
+
+const reviveChatMessages = (messages: SerializedChatMessage[] | undefined): ChatMessage[] => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return [createWelcomeMessage()];
+  }
+
+  return messages.map((message) => ({
+    ...message,
+    timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)
+  }));
+};
+
 function AISandboxPage() {
   const [sandboxData, setSandboxData] = useState<SandboxData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,13 +119,7 @@ function AISandboxPage() {
   const [responseArea, setResponseArea] = useState<string[]>([]);
   const [structureContent, setStructureContent] = useState('No sandbox created yet');
   const [promptInput, setPromptInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      content: 'Welcome! I can help you generate code with full context of your sandbox files and structure. Just start chatting - I\'ll automatically create a sandbox for you if needed!\n\nTip: If you see package errors like "react-router-dom not found", just type "npm install" or "check packages" to automatically install missing packages.',
-      type: 'system',
-      timestamp: new Date()
-    }
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage()]);
   const [aiChatInput, setAiChatInput] = useState('');
   const [aiEnabled] = useState(true);
   const searchParams = useSearchParams();
@@ -159,6 +205,86 @@ function AISandboxPage() {
   // Store flag to trigger generation after component mounts
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
 
+  const restoreSavedSession = (sandboxId: string) => {
+    try {
+      const rawSession = localStorage.getItem(getSessionStorageKey(sandboxId));
+      if (!rawSession) {
+        return false;
+      }
+
+      const savedSession = JSON.parse(rawSession) as SavedGenerationSession;
+      if (savedSession.version !== 1) {
+        return false;
+      }
+
+      setChatMessages(reviveChatMessages(savedSession.chatMessages));
+      setConversationContext({
+        ...savedSession.conversationContext,
+        scrapedWebsites: (savedSession.conversationContext.scrapedWebsites || []).map((site) => ({
+          ...site,
+          timestamp: new Date(site.timestamp)
+        })),
+        appliedCode: (savedSession.conversationContext.appliedCode || []).map((entry) => ({
+          ...entry,
+          timestamp: new Date(entry.timestamp)
+        }))
+      });
+      setPromptInput(savedSession.promptInput || '');
+      setHomeUrlInput(savedSession.homeUrlInput || '');
+      setHomeContextInput(savedSession.homeContextInput || '');
+      setHasInitialSubmission(savedSession.hasInitialSubmission ?? true);
+      setShowHomeScreen(false);
+      setHomeScreenFading(false);
+      setActiveTab(savedSession.activeTab || 'preview');
+      setGenerationProgress(prev => ({
+        ...prev,
+        files: savedSession.generationFiles || [],
+        isGenerating: false,
+        isStreaming: false,
+        isThinking: false,
+        status: savedSession.generationFiles?.length ? 'Session restored' : ''
+      }));
+
+      return true;
+    } catch (error) {
+      console.warn('[generation] Failed to restore saved session:', error);
+      return false;
+    }
+  };
+
+  const persistCurrentSession = (activeSandboxId: string) => {
+    try {
+      const session: SavedGenerationSession = {
+        version: 1,
+        chatMessages,
+        conversationContext: {
+          scrapedWebsites: conversationContext.scrapedWebsites.map((site) => ({
+            ...site,
+            timestamp: site.timestamp.toISOString()
+          })),
+          generatedComponents: conversationContext.generatedComponents,
+          appliedCode: conversationContext.appliedCode.map((entry) => ({
+            ...entry,
+            timestamp: entry.timestamp.toISOString()
+          })),
+          currentProject: conversationContext.currentProject,
+          lastGeneratedCode: conversationContext.lastGeneratedCode
+        },
+        promptInput,
+        generationFiles: generationProgress.files,
+        homeUrlInput,
+        homeContextInput,
+        hasInitialSubmission,
+        activeTab,
+        savedAt: Date.now()
+      };
+
+      localStorage.setItem(getSessionStorageKey(activeSandboxId), JSON.stringify(session));
+    } catch (error) {
+      console.warn('[generation] Failed to persist session:', error);
+    }
+  };
+
   // Clear old conversation data on component mount and create/restore sandbox
   useEffect(() => {
     let isMounted = true;
@@ -172,6 +298,21 @@ function AISandboxPage() {
       const urlParam = searchParams.get('url');
       const templateParam = searchParams.get('template');
       const detailsParam = searchParams.get('details');
+      const sandboxIdParam = searchParams.get('sandbox');
+
+      if (sandboxIdParam) {
+        if (!urlParam) {
+          sessionStorage.removeItem('autoStart');
+        }
+
+        const restoredFromStorage = restoreSavedSession(sandboxIdParam);
+        if (!restoredFromStorage) {
+          setShowHomeScreen(false);
+          setHomeScreenFading(false);
+          setHasInitialSubmission(true);
+          addChatMessage('Restoring sandbox session...', 'system');
+        }
+      }
       
       // Then check session storage as fallback
       const storedUrl = urlParam || sessionStorage.getItem('targetUrl');
@@ -242,34 +383,30 @@ function AISandboxPage() {
         sessionStorage.setItem('autoStart', 'true');
       }
       
-      // Clear old conversation
-      try {
-        await fetch('/api/conversation-state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'clear-old' })
-        });
-        console.log('[home] Cleared old conversation data on mount');
-      } catch (error) {
-        console.error('[ai-sandbox] Failed to clear old conversation:', error);
-        if (isMounted) {
-          addChatMessage('Failed to clear old conversation data.', 'error');
+      if (!sandboxIdParam) {
+        try {
+          await fetch('/api/conversation-state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'clear-old' })
+          });
+          console.log('[home] Cleared old conversation data on mount');
+        } catch (error) {
+          console.error('[ai-sandbox] Failed to clear old conversation:', error);
+          if (isMounted) {
+            addChatMessage('Failed to clear old conversation data.', 'error');
+          }
         }
       }
       
       if (!isMounted) return;
 
-      // Check if sandbox ID is in URL
-      const sandboxIdParam = searchParams.get('sandbox');
-      
       setLoading(true);
       try {
         if (sandboxIdParam) {
           console.log('[home] Attempting to restore sandbox:', sandboxIdParam);
-          // For now, just create a new sandbox - you could enhance this to actually restore
-          // the specific sandbox if your backend supports it
           sandboxCreated = true;
-          await createSandbox(true);
+          await restoreSandbox(sandboxIdParam);
         } else {
           console.log('[home] No sandbox in URL, creating new sandbox automatically...');
           sandboxCreated = true;
@@ -347,10 +484,26 @@ function AISandboxPage() {
     // Only check sandbox status on mount if we don't already have sandboxData
     // AND we're not auto-starting a new generation (which would create a new sandbox)
     const autoStart = sessionStorage.getItem('autoStart');
-    if (!sandboxData && autoStart !== 'true') {
+    if (!sandboxData && autoStart !== 'true' && !searchParams.get('sandbox')) {
       checkSandboxStatus();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!sandboxData?.sandboxId) return;
+    persistCurrentSession(sandboxData.sandboxId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sandboxData?.sandboxId,
+    chatMessages,
+    conversationContext,
+    promptInput,
+    generationProgress.files,
+    homeUrlInput,
+    homeContextInput,
+    hasInitialSubmission,
+    activeTab
+  ]);
 
   useEffect(() => {
     if (chatMessagesRef.current) {
@@ -525,6 +678,70 @@ function AISandboxPage() {
   };
 
   const sandboxCreationRef = useRef<boolean>(false);
+
+  const restoreSandbox = async (sandboxId: string) => {
+    if (sandboxCreationRef.current) {
+      console.log('[restoreSandbox] Sandbox operation already in progress, skipping...');
+      return null;
+    }
+
+    sandboxCreationRef.current = true;
+    setLoading(true);
+    setShowLoadingBackground(true);
+    updateStatus('Restoring sandbox...', false);
+
+    try {
+      const response = await fetch('/api/create-ai-sandbox-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restore: true, sandboxId })
+      });
+
+      const data = await response.json();
+      console.log('[restoreSandbox] Response data:', data);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to restore sandbox');
+      }
+
+      setSandboxData(data);
+      updateStatus('Sandbox active', true);
+      log(`Sandbox restored: ${data.sandboxId}`);
+      log(`URL: ${data.url}`);
+
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set('sandbox', data.sandboxId);
+      newParams.set('model', aiModel);
+      router.replace(`/generation?${newParams.toString()}`, { scroll: false });
+
+      setShowHomeScreen(false);
+      setHomeScreenFading(false);
+      setHasInitialSubmission(true);
+
+      setTimeout(() => {
+        setShowLoadingBackground(false);
+      }, 1000);
+
+      setTimeout(() => fetchSandboxFiles(data), 500);
+
+      setTimeout(() => {
+        if (iframeRef.current) {
+          iframeRef.current.src = `${data.url}?t=${Date.now()}&restored=true`;
+        }
+      }, 100);
+
+      return data;
+    } catch (error: any) {
+      console.error('[restoreSandbox] Error:', error);
+      updateStatus('Error', false);
+      log(`Failed to restore sandbox: ${error.message}`, 'error');
+      addChatMessage(`Failed to restore sandbox: ${error.message}`, 'error');
+      throw error;
+    } finally {
+      setLoading(false);
+      sandboxCreationRef.current = false;
+    }
+  };
   
   const createSandbox = async (fromHomeScreen = false) => {
     // Prevent duplicate sandbox creation
@@ -576,7 +793,7 @@ function AISandboxPage() {
         }
         
         // Fetch sandbox files after creation
-        setTimeout(fetchSandboxFiles, 1000);
+        setTimeout(() => fetchSandboxFiles(data), 1000);
         
         // For Vercel sandboxes, Vite is already started during setupViteApp
         // No need to restart it immediately after creation
@@ -1063,8 +1280,8 @@ Tip: I automatically detect and install npm packages from your code imports (lik
     }
   };
 
-  const fetchSandboxFiles = async () => {
-    if (!sandboxData) return;
+  const fetchSandboxFiles = async (overrideSandboxData?: SandboxData | null) => {
+    if (!overrideSandboxData && !sandboxData) return;
     
     try {
       const response = await fetch('/api/get-sandbox-files', {
@@ -1178,80 +1395,112 @@ Tip: I automatically detect and install npm packages from your code imports (lik
                   <div className="ml-6">
                     {/* Group files by directory */}
                     {(() => {
-                      const fileTree: { [key: string]: Array<{ name: string; edited?: boolean }> } = {};
-                      
-                      // Create a map of edited files
-                      // const editedFiles = new Set(
-                      //   generationProgress.files
-                      //     .filter(f => f.edited)
-                      //     .map(f => f.path)
-                      // );
-                      
-                      // Process all files from generation progress
+                      type TreeNode = {
+                        name: string;
+                        path: string;
+                        children: Map<string, TreeNode>;
+                        file?: { name: string; path: string; edited?: boolean };
+                      };
+
+                      const root: TreeNode = {
+                        name: '',
+                        path: '',
+                        children: new Map(),
+                      };
+
                       generationProgress.files.forEach(file => {
-                        const parts = file.path.split('/');
-                        const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-                        const fileName = parts[parts.length - 1];
-                        
-                        if (!fileTree[dir]) fileTree[dir] = [];
-                        fileTree[dir].push({
-                          name: fileName,
-                          edited: file.edited || false
+                        const parts = file.path.split('/').filter(Boolean);
+                        let current = root;
+
+                        parts.forEach((part, index) => {
+                          const path = parts.slice(0, index + 1).join('/');
+                          const isFile = index === parts.length - 1;
+
+                          if (!current.children.has(part)) {
+                            current.children.set(part, {
+                              name: part,
+                              path,
+                              children: new Map(),
+                            });
+                          }
+
+                          const next = current.children.get(part)!;
+                          if (isFile) {
+                            next.file = {
+                              name: part,
+                              path: file.path,
+                              edited: file.edited || false,
+                            };
+                          }
+
+                          current = next;
                         });
                       });
-                      
-                      return Object.entries(fileTree).map(([dir, files]) => (
-                        <div key={dir} className="mb-1">
-                          {dir && (
-                            <div 
-                              className="flex items-center gap-2 py-0.5 px-3 hover:bg-gray-100 rounded cursor-pointer text-gray-700"
-                              onClick={() => toggleFolder(dir)}
-                            >
-                              {expandedFolders.has(dir) ? (
-                                <FiChevronDown style={{ width: '16px', height: '16px' }} className="text-gray-600" />
-                              ) : (
-                                <FiChevronRight style={{ width: '16px', height: '16px' }} className="text-gray-600" />
-                              )}
-                              {expandedFolders.has(dir) ? (
-                                <BsFolder2Open style={{ width: '16px', height: '16px' }} className="text-yellow-600" />
-                              ) : (
-                                <BsFolderFill style={{ width: '16px', height: '16px' }} className="text-yellow-600" />
-                              )}
-                              <span className="text-gray-700">{dir.split('/').pop()}</span>
-                            </div>
-                          )}
-                          {(!dir || expandedFolders.has(dir)) && (
-                            <div className={dir ? 'ml-8' : ''}>
-                              {files.sort((a, b) => a.name.localeCompare(b.name)).map(fileInfo => {
-                                const fullPath = dir ? `${dir}/${fileInfo.name}` : fileInfo.name;
-                                const isSelected = selectedFile === fullPath;
-                                
-                                return (
-                                  <div 
-                                    key={fullPath} 
-                                    className={`flex items-center gap-2 py-0.5 px-3 rounded cursor-pointer transition-all ${
-                                      isSelected 
-                                        ? 'bg-blue-500 text-white' 
-                                        : 'text-gray-700 hover:bg-gray-100'
-                                    }`}
-                                    onClick={() => handleFileClick(fullPath)}
-                                  >
-                                    {getFileIcon(fileInfo.name)}
-                                    <span className={`text-xs flex items-center gap-1 ${isSelected ? 'font-medium' : ''}`}>
-                                      {fileInfo.name}
-                                      {fileInfo.edited && (
-                                        <span className={`text-[10px] px-1 rounded ${
-                                          isSelected ? 'bg-blue-400' : 'bg-orange-500 text-white'
-                                        }`}>✓</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ));
+
+                      const renderTree = (nodes: Map<string, TreeNode>, depth = 0): any => {
+                        return Array.from(nodes.values())
+                          .sort((a, b) => {
+                            const aIsFile = Boolean(a.file);
+                            const bIsFile = Boolean(b.file);
+                            if (aIsFile !== bIsFile) return aIsFile ? 1 : -1;
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map(node => {
+                            if (node.file) {
+                              const isSelected = selectedFile === node.file.path;
+
+                              return (
+                                <div
+                                  key={node.file.path}
+                                  className={`flex items-center gap-2 py-0.5 px-3 rounded cursor-pointer transition-all ${
+                                    isSelected
+                                      ? 'bg-blue-500 text-white'
+                                      : 'text-gray-700 hover:bg-gray-100'
+                                  }`}
+                                  style={{ marginLeft: depth * 16 }}
+                                  onClick={() => handleFileClick(node.file!.path)}
+                                >
+                                  {getFileIcon(node.file.name)}
+                                  <span className={`text-xs flex items-center gap-1 ${isSelected ? 'font-medium' : ''}`}>
+                                    {node.file.name}
+                                    {node.file.edited && (
+                                      <span className={`text-[10px] px-1 rounded ${
+                                        isSelected ? 'bg-blue-400' : 'bg-orange-500 text-white'
+                                      }`}>✓</span>
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            const isExpanded = expandedFolders.has(node.path);
+
+                            return (
+                              <div key={node.path} className="mb-1">
+                                <div
+                                  className="flex items-center gap-2 py-0.5 px-3 hover:bg-gray-100 rounded cursor-pointer text-gray-700"
+                                  style={{ marginLeft: depth * 16 }}
+                                  onClick={() => toggleFolder(node.path)}
+                                >
+                                  {isExpanded ? (
+                                    <FiChevronDown style={{ width: '16px', height: '16px' }} className="text-gray-600" />
+                                  ) : (
+                                    <FiChevronRight style={{ width: '16px', height: '16px' }} className="text-gray-600" />
+                                  )}
+                                  {isExpanded ? (
+                                    <BsFolder2Open style={{ width: '16px', height: '16px' }} className="text-yellow-600" />
+                                  ) : (
+                                    <BsFolderFill style={{ width: '16px', height: '16px' }} className="text-yellow-600" />
+                                  )}
+                                  <span className="text-gray-700">{node.name}</span>
+                                </div>
+                                {isExpanded && renderTree(node.children, depth + 1)}
+                              </div>
+                            );
+                          });
+                      };
+
+                      return renderTree(root.children);
                     })()}
                   </div>
                 )}
@@ -1259,7 +1508,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
             </div>
           </div>
           )}
-          
+
           {/* Code Content */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Thinking Mode Display - Only show during active generation */}
@@ -2189,7 +2438,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
         
         const link = document.createElement('a');
         link.href = data.dataUrl;
-        link.download = data.fileName || 'e2b-project.zip';
+        link.download = data.fileName || 'opensandbox-project.zip';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -2199,7 +2448,7 @@ Tip: I automatically detect and install npm packages from your code imports (lik
           '1. Unzip the file\n' +
           '2. Run: npm install\n' +
           '3. Run: npm run dev\n' +
-          '4. Open http://localhost:5173',
+          '4. Open http://localhost:8080',
           'system'
         );
       } else {

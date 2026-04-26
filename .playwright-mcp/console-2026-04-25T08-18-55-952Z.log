@@ -1,0 +1,10 @@
+[     537ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_compiled_react-dom_5e4713c5._.js:14475
+[    1183ms] [LOG] [Fast Refresh] done in NaNms @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5557
+[    1267ms] [LOG] [home] Cleared old conversation data on mount @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2036
+[    1267ms] [LOG] [home] No sandbox in URL, creating new sandbox automatically... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2055
+[    1267ms] [LOG] [createSandbox] Starting sandbox creation... @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2356
+[    1381ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5693
+[    1398ms] [LOG] [checkSandboxStatus] No existing sandboxData, clearing state @ http://localhost:3000/_next/static/chunks/_e7167437._.js:2327
+[    1403ms] [LOG] [Fast Refresh] done in 124ms @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5557
+[    7298ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5693
+[    7394ms] [LOG] [Fast Refresh] done in 198ms @ http://localhost:3000/_next/static/chunks/dd69f_next_dist_client_7c9faeaf._.js:5557

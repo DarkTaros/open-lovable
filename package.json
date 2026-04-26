@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.4",
-    "@e2b/code-interpreter": "^2.0.0",
+    "@alibaba-group/opensandbox": "^0.1.6",
     "@mendable/firecrawl-js": "^4.3.3",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -46,7 +46,6 @@
     "@tabler/icons-react": "^3.34.1",
     "@tailwindcss/typography": "^0.5.16",
     "@types/react-syntax-highlighter": "^15.5.13",
-    "@vercel/sandbox": "^0.0.17",
     "ai": "^5.0.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",

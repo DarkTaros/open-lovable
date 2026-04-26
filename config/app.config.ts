@@ -2,50 +2,39 @@
 // This file contains all configurable settings for the application
 
 export const appConfig = {
-  // Vercel Sandbox Configuration
-  vercelSandbox: {
-    // Sandbox timeout in minutes
-    timeoutMinutes: 15,
+  // OpenSandbox Configuration
+  openSandbox: {
+    // API server domain. Override with OPENSANDBOX_DOMAIN when self-hosting.
+    domain: process.env.OPENSANDBOX_DOMAIN || process.env.OPEN_SANDBOX_DOMAIN || "api.opensandbox.io",
 
-    // Convert to milliseconds for Vercel Sandbox API
-    get timeoutMs() {
-      return this.timeoutMinutes * 60 * 1000;
-    },
+    // Container image used for generated Vite projects.
+    image: "node:22",
 
-    // Development server port (Vercel Sandbox typically uses 3000 for Next.js/React)
-    devPort: 3000,
+    // Sandbox timeout in seconds.
+    timeoutSeconds: 30 * 60,
 
-    // Time to wait for dev server to be ready (in milliseconds)
-    devServerStartupDelay: 7000,
+    // SDK HTTP request timeout in seconds.
+    requestTimeoutSeconds: 60,
 
-    // Time to wait for CSS rebuild (in milliseconds)
-    cssRebuildDelay: 2000,
+    // Command execution timeout in seconds.
+    commandTimeoutSeconds: 120,
 
-    // Working directory in sandbox
-    workingDirectory: "/app",
-
-    // Default runtime for sandbox
-    runtime: "node22", // Available: node22, python3.13, v0-next-shadcn, cua-ubuntu-xfce
-  },
-
-  // E2B Sandbox Configuration
-  e2b: {
-    // Sandbox timeout in minutes
-    timeoutMinutes: 30,
-
-    // Convert to milliseconds for E2B API
-    get timeoutMs() {
-      return this.timeoutMinutes * 60 * 1000;
-    },
-
-    // Development server port (E2B uses 5173 for Vite)
-    vitePort: 5173,
+    // Development server port.
+    // OpenSandbox's Docker backend maps container port 8080 directly; other
+    // ports go through /proxy/{port}, which conflicts with Vite base redirects.
+    vitePort: 8080,
 
     // Time to wait for Vite dev server to be ready (in milliseconds)
     viteStartupDelay: 10000,
 
     // Working directory in sandbox
     workingDirectory: "/home/user/app",
+
+    // Optional container resource limits.
+    resource: undefined as Record<string, string> | undefined,
+
+    // Optional environment variables injected into the sandbox.
+    env: undefined as Record<string, string> | undefined,
   },
 
   // AI Model Configuration
